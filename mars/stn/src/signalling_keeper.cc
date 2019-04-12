@@ -33,128 +33,114 @@
 using namespace mars::stn;
 
 static unsigned int g_period = 5 * 1000;  // ms
-static unsigned int g_keepTime = 20 *1000;  // ms
+static unsigned int g_keepTime = 20 * 1000;  // ms
 
 
-SignallingKeeper::SignallingKeeper(const LongLink& _longlink, MessageQueue::MessageQueue_t _messagequeue_id, bool _use_UDP)
-:msgreg_(MessageQueue::InstallAsyncHandler(_messagequeue_id))
-, last_touch_time_(0)
-, keeping_(false)
-, longlink_(_longlink)
-, port_(0)
-, udp_client_(ip_, port_, this)
-, use_UDP_(_use_UDP)
-{
-    xinfo2(TSF"SignallingKeeper messagequeue_id=%_, handler:(%_,%_)", MessageQueue::Handler2Queue(msgreg_.Get()), msgreg_.Get().queue, msgreg_.Get().seq);
+SignallingKeeper::SignallingKeeper(const LongLink &longLink, MessageQueue::MessageQueue_t msgQueueId,
+                                   bool useUdp)
+        : mMsgReg(MessageQueue::InstallAsyncHandler(msgQueueId))
+        , mLastTouchTime(0)
+        , mKeeping(false)
+        , mLongLink(longLink)
+        , mPort(0)
+        , mUdpClient(mIP, mPort, this)
+        , mUseUdp(useUdp) {
+    xinfo2(TSF"SignallingKeeper messagequeue_id=%_, handler:(%_,%_)", MessageQueue::Handler2Queue(mMsgReg.Get()),
+           mMsgReg.Get().queue, mMsgReg.Get().seq);
 }
 
-SignallingKeeper::~SignallingKeeper()
-{
+SignallingKeeper::~SignallingKeeper() {
     Stop();
 }
 
 
-void SignallingKeeper::SetStrategy(unsigned int _period, unsigned int _keep_time)
-{
-    xinfo2(TSF"signal keeper period:%0, keepTime:%1", _period, _keep_time);
-    xassert2(_period > 0);
-    xassert2(_keep_time > 0);
-    if (_period == 0 || _keep_time == 0)
-    {
+void SignallingKeeper::SetStrategy(unsigned int period, unsigned int keepTime) {
+    xinfo2(TSF"signal keeper period:%0, keepTime:%1", period, keepTime);
+    xassert2(period > 0);
+    xassert2(keepTime > 0);
+    if (period == 0 || keepTime == 0) {
         xerror2(TSF"wrong strategy");
         return;
     }
-    
-    g_period = _period;
-    g_keepTime = _keep_time;
+
+    g_period = period;
+    g_keepTime = keepTime;
 }
 
-void SignallingKeeper::OnNetWorkDataChanged(const char*, ssize_t, ssize_t)
-{
-    if (!keeping_) return;
+void SignallingKeeper::OnNetWorkDataChanged(const char *, ssize_t, ssize_t) {
+    if (!mKeeping) return;
     uint64_t now = ::gettickcount();
-    xassert2(now >= last_touch_time_);
-    
-    if (now < last_touch_time_ || now - last_touch_time_ > g_keepTime)
-    {
-        keeping_ = false;
+    xassert2(now >= mLastTouchTime);
+
+    if (now < mLastTouchTime || now - mLastTouchTime > g_keepTime) {
+        mKeeping = false;
         return;
     }
-    
-    if (postid_ != MessageQueue::KNullPost) {
-        MessageQueue::CancelMessage(postid_);
+
+    if (mPostId != MessageQueue::KNullPost) {
+        MessageQueue::CancelMessage(mPostId);
     }
-    
-    postid_ = MessageQueue::AsyncInvokeAfter(g_period, boost::bind(&SignallingKeeper::__OnTimeOut, this), msgreg_.Get(), "SignallingKeeper::__OnTimeOut");
+
+    mPostId = MessageQueue::AsyncInvokeAfter(g_period, boost::bind(&SignallingKeeper::__OnTimeOut, this), mMsgReg.Get(),
+                                             "SignallingKeeper::__OnTimeOut");
 }
 
 
+void SignallingKeeper::Keep() {
+    xinfo2(TSF"start signalling, period:%0, keepTime:%1, use udp:%2, mKeeping:%3", g_period, g_keepTime, mUseUdp,
+           mKeeping);
+    mLastTouchTime = ::gettickcount();
 
-void SignallingKeeper::Keep()
-{
-    xinfo2(TSF"start signalling, period:%0, keepTime:%1, use udp:%2, keeping_:%3", g_period, g_keepTime, use_UDP_, keeping_);
-    last_touch_time_ = ::gettickcount();
-
-    if (!keeping_)
-    {
+    if (!mKeeping) {
         __SendSignallingBuffer();
-        keeping_ = true;
+        mKeeping = true;
     }
 }
 
-void SignallingKeeper::Stop()
-{
+void SignallingKeeper::Stop() {
     xinfo2(TSF"stop signalling");
-    
-    if (keeping_ && postid_ != MessageQueue::KNullPost) {
-        keeping_ = false;
-        MessageQueue::CancelMessage(postid_);
+
+    if (mKeeping && mPostId != MessageQueue::KNullPost) {
+        mKeeping = false;
+        MessageQueue::CancelMessage(mPostId);
     }
 }
 
-void SignallingKeeper::__SendSignallingBuffer()
-{
-    if (use_UDP_)
-    {
-        ConnectProfile link_info = longlink_.Profile();
-        if (udp_client_.HasBuuferToSend()) return;
-        
+void SignallingKeeper::__SendSignallingBuffer() {
+    if (mUseUdp) {
+        ConnectProfile link_info = mLongLink.Profile();
+        if (mUdpClient.HasBuuferToSend()) return;
+
         if (link_info.ip != "" && link_info.port != 0
-           && link_info.ip != ip_ && link_info.port != port_)
-        {
-            ip_ = link_info.ip;
-            port_ = link_info.port;
+            && link_info.ip != mIP && link_info.port != mPort) {
+            mIP = link_info.ip;
+            mPort = link_info.port;
         }
-        
-        if (ip_ != "" && port_ != 0)
-        {
-            udp_client_.SetIpPort(ip_, port_);
+
+        if (mIP != "" && mPort != 0) {
+            mUdpClient.SetIpPort(mIP, mPort);
             AutoBuffer buffer;
             longlink_pack(signal_keep_cmdid(), 0, KNullAtuoBuffer, KNullAtuoBuffer, buffer, NULL);
-            udp_client_.SendAsync(buffer.Ptr(), buffer.Length());
+            mUdpClient.SendAsync(buffer.Ptr(), buffer.Length());
         }
     } else {
-        if (fun_send_signalling_buffer_)
-        {
-            fun_send_signalling_buffer_(KNullAtuoBuffer, KNullAtuoBuffer, signal_keep_cmdid());
+        if (SendBufferHook) {
+            SendBufferHook(KNullAtuoBuffer, KNullAtuoBuffer, signal_keep_cmdid());
         }
     }
 }
 
-void SignallingKeeper::__OnTimeOut()
-{
+void SignallingKeeper::__OnTimeOut() {
     xdebug2(TSF"sent signalling, period:%0", g_period);
     __SendSignallingBuffer();
 }
 
-void SignallingKeeper::OnError(UdpClient* _this, int _errno)
-{
-}
-void SignallingKeeper::OnDataGramRead(UdpClient* _this, void* _buf, size_t _len)
-{
+void SignallingKeeper::OnError(UdpClient *self, int errNO) {
 }
 
-void SignallingKeeper::OnDataSent(UdpClient* _this)
-{
+void SignallingKeeper::OnDataGramRead(UdpClient *self, void *bufferReq, size_t len) {
+}
+
+void SignallingKeeper::OnDataSent(UdpClient *self) {
     OnNetWorkDataChanged("", 0, 0);
 }

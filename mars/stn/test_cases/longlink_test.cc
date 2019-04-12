@@ -221,7 +221,7 @@ class LongLinkObserver2 : public MLongLinkObserver2
 public:
 
     virtual void OnStartSendTime(unsigned int _nSeq) {}
-	virtual void OnResponse(ErrCmdType _type, int _errcode, int _cmdid, unsigned int _seq, AutoBuffer& _body, const LongLinkConnectionInfo& _info) {}
+	virtual void OnResponse(ErrCmdType type, int errCode, int cmdId, unsigned int _seq, AutoBuffer& body, const LongLinkConnectionInfo& _info) {}
     virtual void OnPkgRecvTime(unsigned int _nSeq, unsigned int _cachedsize, unsigned int _totalsize) {}
 };
 
@@ -231,12 +231,12 @@ public:
 	bool Mine_GetLongLinkItems(std::vector<IPPortItem>& _IPPortItems);
 	bool Mine_GetMixLongLinkItems(std::vector<IPPortItem>& _IPPortItems);
 
-	void Mine_ReportLongIP(bool _isSuccess, const std::string& _ip, unsigned int _port);
+	void Mine_ReportLongIP(bool isSuccess, const std::string& ip, unsigned int port);
 
 
 	static bool (CDetour::* Real_GetLongLinkItems)(std::vector<IPPortItem>& _IPPortItems);
 	static bool (CDetour::* Real_GetMixLongLinkItems)(std::vector<IPPortItem>& _IPPortItems);
-	static void (CDetour::* Real_ReportLongIP)(bool _isSuccess, const std::string& _ip, unsigned int _port);
+	static void (CDetour::* Real_ReportLongIP)(bool isSuccess, const std::string& ip, unsigned int port);
 
 };
 
@@ -260,20 +260,20 @@ bool CDetour::Mine_GetMixLongLinkItems(std::vector<IPPortItem>& _IPPortItems)
 	return true;
 }
 
-void CDetour::Mine_ReportLongIP(bool _isSuccess, const std::string& _ip, unsigned int _port)
+void CDetour::Mine_ReportLongIP(bool isSuccess, const std::string& ip, unsigned int port)
 {
 	
 }
 
 
-void __OnLongLinkNetworkError(int _line, ErrCmdType _eErrType, int _nErrCode, const std::string& _ip, unsigned int _port)
+void __OnLongLinkNetworkError(int _line, ErrCmdType _eErrType, int _nErrCode, const std::string& ip, unsigned int port)
 {
-	//printf("%s:%u, err(%d, %d), line:%d\n", _ip.c_str(), _port, _eErrType, _nErrCode, _line);
+	//printf("%s:%u, err(%d, %d), line:%d\n", ip.c_str(), port, _eErrType, _nErrCode, _line);
 }
 
 bool (CDetour::* CDetour::Real_GetLongLinkItems)(std::vector<IPPortItem>& _IPPortItems) = (bool (CDetour::*)(std::vector<IPPortItem>& _IPPortItems)) &CMMNetSource::GetLongLinkItems;
 bool (CDetour::* CDetour::Real_GetMixLongLinkItems)(std::vector<IPPortItem>& _IPPortItems) = (bool (CDetour::*)(std::vector<IPPortItem>& _IPPortItems)) &CMMNetSource::GetMixLongLinkItems;
-void (CDetour::* CDetour::Real_ReportLongIP)(bool _isSuccess, const std::string& _ip, unsigned int _port) = (void (CDetour::*)(bool _isSuccess, const std::string& _ip, unsigned int _port)) &CMMNetSource::ReportLongIP;
+void (CDetour::* CDetour::Real_ReportLongIP)(bool isSuccess, const std::string& ip, unsigned int port) = (void (CDetour::*)(bool isSuccess, const std::string& ip, unsigned int port)) &CMMNetSource::ReportLongIP;
 
 static uint64_t sg_lastChangeTime = gettickcount();
 static uint64_t sg_nowChangeTime = gettickcount();
@@ -350,7 +350,7 @@ TEST(MMLongLink2_test, longlinkconnect_test0)
 
 	static bool (CDetour::* Mine_Target1)(std::vector<IPPortItem>& _IPPortItems) = &CDetour::Mine_GetLongLinkItems;
 	static bool (CDetour::* Mine_Target2)(std::vector<IPPortItem>& _IPPortItems) = &CDetour::Mine_GetMixLongLinkItems;
-	static void (CDetour::* Mine_Target3)(bool _isSuccess, const std::string& _ip, unsigned int _port) = &CDetour::Mine_ReportLongIP;
+	static void (CDetour::* Mine_Target3)(bool isSuccess, const std::string& ip, unsigned int port) = &CDetour::Mine_ReportLongIP;
 
 //	xlogger_SetLevel(ELevelDebug);
 //	appender_open(EAppednerSync, "C:\\log", "GTEST");

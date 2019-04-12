@@ -50,7 +50,7 @@ UdpServer::UdpServer(int _port, IAsyncUdpServerEvent* _event)
 }
 
 UdpServer::~UdpServer() {
-    if (thread_->isruning()) {
+    if (thread_->isRunning()) {
         event_ = NULL;
         breaker_.Break();
         thread_->join();
@@ -97,7 +97,7 @@ void UdpServer::SendAsync(struct sockaddr_in* _addr, void* _buf, size_t _len) {
     list_buffer_.push_back(UdpServerSendData(_addr));
     list_buffer_.back().data.Write(_buf, _len);
 
-    if (!thread_->isruning())
+    if (!thread_->isRunning())
         thread_->start();
 
     breaker_.Break();

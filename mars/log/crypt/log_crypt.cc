@@ -42,18 +42,6 @@ static const char kMagicEnd  = '\0';
 
 const static int TEA_BLOCK_LEN = 8;
 
-static void __TeaEncrypt (uint32_t* v, uint32_t* k) {
-    uint32_t v0=v[0], v1=v[1], sum=0, i;
-    const static uint32_t delta=0x9e3779b9;
-    uint32_t k0=k[0], k1=k[1], k2=k[2], k3=k[3];
-    for (i=0; i < 16; i++) {
-        sum += delta;
-        v0 += ((v1<<4) + k0) ^ (v1 + sum) ^ ((v1>>5) + k1);
-        v1 += ((v0<<4) + k2) ^ (v0 + sum) ^ ((v0>>5) + k3);
-    }
-    v[0]=v0; v[1]=v1;
-}
-
 static uint16_t __GetSeq(bool _is_async) {
     
     if (!_is_async) {
@@ -72,6 +60,20 @@ static uint16_t __GetSeq(bool _is_async) {
 }
 
 #ifndef XLOG_NO_CRYPT
+
+static void __TeaEncrypt (uint32_t* v, uint32_t* k) {
+    uint32_t v0=v[0], v1=v[1], sum=0, i;
+    const static uint32_t delta=0x9e3779b9;
+    uint32_t k0=k[0], k1=k[1], k2=k[2], k3=k[3];
+    for (i=0; i < 16; i++) {
+        sum += delta;
+        v0 += ((v1<<4) + k0) ^ (v1 + sum) ^ ((v1>>5) + k1);
+        v1 += ((v0<<4) + k2) ^ (v0 + sum) ^ ((v0>>5) + k3);
+    }
+    v[0]=v0; v[1]=v1;
+}
+
+
 static bool Hex2Buffer(const char* _str, size_t _len, unsigned char* _buffer) {
     
     if (NULL == _str || _len ==0 || _len % 2 != 0) {

@@ -31,8 +31,11 @@
 #include "mars/comm/autobuffer.h"
 #include "mars/comm/move_wrapper.h"
 #include "mars/comm/platform_comm.h"
+
 #ifdef ANDROID
+
 #include "mars/comm/android/wakeuplock.h"
+
 #endif
 
 #include "dynamic_timeout.h"
@@ -42,66 +45,67 @@
 using namespace mars::stn;
 using namespace mars::app;
 
-#define AYNC_HANDLER asyncreg_.Get()
+#define AYNC_HANDLER mAsyncReg.Get()
 #define RETURN_SHORTLINK_SYNC2ASYNC_FUNC_TITLE(func, title) RETURN_SYNC2ASYNC_FUNC_TITLE(func, title, )
 
-ShortLinkTaskManager::ShortLinkTaskManager(NetSource& _netsource, DynamicTimeout& _dynamictimeout, MessageQueue::MessageQueue_t _messagequeueid)
-    : asyncreg_(MessageQueue::InstallAsyncHandler(_messagequeueid))
-    , net_source_(_netsource)
-    , default_use_proxy_(true)
-    , tasks_continuous_fail_count_(0)
-    , dynamic_timeout_(_dynamictimeout)
+ShortLinkTaskManager::ShortLinkTaskManager(NetSource &netSource, DynamicTimeout &_dynamictimeout,
+                                           MessageQueue::MessageQueue_t msgQueueId)
+        : mAsyncReg(MessageQueue::InstallAsyncHandler(msgQueueId))
+        , mNetSource(netSource)
+        , mDefaultUseProxy(true)
+        , mTasksContinuousFailCount(0)
+        , mDynamicTimeout(_dynamictimeout)
 #ifdef ANDROID
-    , wakeup_lock_(new WakeUpLock())
+        , mWakeupLock(new WakeUpLock())
 #endif
 {
-    xinfo_function(TSF"handler:(%_,%_)", asyncreg_.Get().queue, asyncreg_.Get().seq);
-    xinfo2(TSF"ShortLinkTaskManager messagequeue_id=%_", MessageQueue::Handler2Queue(asyncreg_.Get()));
+    xinfo_function(TSF"handler:(%_,%_)", mAsyncReg.Get().queue, mAsyncReg.Get().seq);
+    xinfo2(TSF"ShortLinkTaskManager messagequeue_id=%_", MessageQueue::Handler2Queue(mAsyncReg.Get()));
 }
 
 ShortLinkTaskManager::~ShortLinkTaskManager() {
     xinfo_function();
-    asyncreg_.CancelAndWait();
-    xinfo2(TSF"lst_cmd_ count=%0", lst_cmd_.size());
+    mAsyncReg.CancelAndWait();
+    xinfo2(TSF"mTaskList count=%0", mTaskList.size());
     __BatchErrorRespHandle(kEctLocal, kEctLocalReset, kTaskFailHandleTaskEnd, Task::kInvalidTaskID, false);
 #ifdef ANDROID
-    delete wakeup_lock_;
+    delete mWakeupLock;
 #endif
 }
 
-bool ShortLinkTaskManager::StartTask(const Task& _task) {
+bool ShortLinkTaskManager::StartTask(const Task &task0) {
     xverbose_function();
 
-    if (_task.send_only) {
+    if (task0.sendOnly) {
         xassert2(false);
-        xerror2(TSF"taskid:%_, short link should have resp", _task.taskid);
+        xerror2(TSF"taskId:%_, short link should have resp", task0.taskId);
         return false;
     }
 
-    xdebug2(TSF"taskid:%0", _task.taskid);
+    xdebug2(TSF"taskId:%0", task0.taskId);
 
-    TaskProfile task(_task);
-    task.link_type = Task::kChannelShort;
+    TaskProfile task(task0);
+    task.linkType = Task::kChannelShort;
 
-    lst_cmd_.push_back(task);
-    lst_cmd_.sort(__CompareTask);
+    mTaskList.push_back(task);
+    mTaskList.sort(__CompareTask);
 
     __RunLoop();
     return true;
 }
 
-bool ShortLinkTaskManager::StopTask(uint32_t _taskid) {
+bool ShortLinkTaskManager::StopTask(uint32_t taskId) {
     xverbose_function();
 
-    std::list<TaskProfile>::iterator first = lst_cmd_.begin();
-    std::list<TaskProfile>::iterator last = lst_cmd_.end();
+    std::list<TaskProfile>::iterator first = mTaskList.begin();
+    std::list<TaskProfile>::iterator last = mTaskList.end();
 
     while (first != last) {
-        if (_taskid == first->task.taskid) {
-            xinfo2(TSF"find the task, taskid:%0", _taskid);
+        if (taskId == first->task.taskId) {
+            xinfo2(TSF"find the task, taskId:%0", taskId);
 
-            __DeleteShortLink(first->running_id);
-            lst_cmd_.erase(first);
+            __DeleteShortLink(first->runningId);
+            mTaskList.erase(first);
             return true;
         }
 
@@ -111,14 +115,14 @@ bool ShortLinkTaskManager::StopTask(uint32_t _taskid) {
     return false;
 }
 
-bool ShortLinkTaskManager::HasTask(uint32_t _taskid) const {
+bool ShortLinkTaskManager::HasTask(uint32_t taskId) const {
     xverbose_function();
 
-    std::list<TaskProfile>::const_iterator first = lst_cmd_.begin();
-    std::list<TaskProfile>::const_iterator last = lst_cmd_.end();
+    std::list<TaskProfile>::const_iterator first = mTaskList.begin();
+    std::list<TaskProfile>::const_iterator last = mTaskList.end();
 
     while (first != last) {
-        if (_taskid == first->task.taskid) {
+        if (taskId == first->task.taskId) {
             return true;
         }
         ++first;
@@ -130,25 +134,25 @@ bool ShortLinkTaskManager::HasTask(uint32_t _taskid) const {
 void ShortLinkTaskManager::ClearTasks() {
     xverbose_function();
 
-    xinfo2(TSF"cmd size:%0", lst_cmd_.size());
+    xinfo2(TSF"cmd size:%0", mTaskList.size());
 
-    for (std::list<TaskProfile>::iterator it = lst_cmd_.begin(); it != lst_cmd_.end(); ++it) {
-        __DeleteShortLink(it->running_id);
+    for (std::list<TaskProfile>::iterator it = mTaskList.begin(); it != mTaskList.end(); ++it) {
+        __DeleteShortLink(it->runningId);
     }
 
-    lst_cmd_.clear();
+    mTaskList.clear();
 }
 
 unsigned int ShortLinkTaskManager::GetTasksContinuousFailCount() {
-    return tasks_continuous_fail_count_;
+    return mTasksContinuousFailCount;
 }
 
 
 void ShortLinkTaskManager::__RunLoop() {
-    if (lst_cmd_.empty()) {
+    if (mTaskList.empty()) {
 #ifdef ANDROID
         /*cancel the last wakeuplock*/
-        wakeup_lock_->Lock(500);
+        mWakeupLock->Lock(500);
 #endif
         return;
     }
@@ -156,25 +160,27 @@ void ShortLinkTaskManager::__RunLoop() {
     __RunOnTimeout();
     __RunOnStartTask();
 
-    if (!lst_cmd_.empty()) {
+    if (!mTaskList.empty()) {
 #ifdef ANDROID
-        wakeup_lock_->Lock(60 * 1000);
+        mWakeupLock->Lock(60 * 1000);
 #endif
-        MessageQueue::FasterMessage(asyncreg_.Get(),
-                                    MessageQueue::Message((MessageQueue::MessageTitle_t)this, boost::bind(&ShortLinkTaskManager::__RunLoop, this), "ShortLinkTaskManager::__RunLoop"),
+        MessageQueue::FasterMessage(mAsyncReg.Get(),
+                                    MessageQueue::Message((MessageQueue::MessageTitle_t) this,
+                                                          boost::bind(&ShortLinkTaskManager::__RunLoop, this),
+                                                          "ShortLinkTaskManager::__RunLoop"),
                                     MessageQueue::MessageTiming(1000));
     } else {
 #ifdef ANDROID
         /*cancel the last wakeuplock*/
-        wakeup_lock_->Lock(500);
+        mWakeupLock->Lock(500);
 #endif
     }
 }
 
 void ShortLinkTaskManager::__RunOnTimeout() {
-    xverbose2(TSF"lst_cmd_ size=%0", lst_cmd_.size());
-    std::list<TaskProfile>::iterator first = lst_cmd_.begin();
-    std::list<TaskProfile>::iterator last = lst_cmd_.end();
+    xverbose2(TSF"mTaskList size=%0", mTaskList.size());
+    std::list<TaskProfile>::iterator first = mTaskList.begin();
+    std::list<TaskProfile>::iterator last = mTaskList.end();
 
     uint64_t cur_time = ::gettickcount();
 
@@ -185,21 +191,32 @@ void ShortLinkTaskManager::__RunOnTimeout() {
         ErrCmdType err_type = kEctLocal;
         int socket_timeout_code = 0;
 
-        if (cur_time - first->start_task_time >= first->task_timeout) {
+        if (cur_time - first->startTaskTime >= first->taskTimeout) {
             err_type = kEctLocal;
             socket_timeout_code = kEctLocalTaskTimeout;
-        } else if (first->running_id && 0 < first->transfer_profile.start_send_time && cur_time - first->transfer_profile.start_send_time >= first->transfer_profile.read_write_timeout) {
-            xerror2(TSF"task read-write timeout, taskid:%_, wworker:%_, nStartSendTime:%_, nReadWriteTimeOut:%_", first->task.taskid, (void*)first->running_id, first->transfer_profile.start_send_time / 1000, first->transfer_profile.read_write_timeout / 1000);
+        } else if (first->runningId && 0 < first->transferProfile.startSendTime &&
+                   cur_time - first->transferProfile.startSendTime >= first->transferProfile.readWriteTimeout) {
+            xerror2(TSF"task read-write timeout, taskId:%_, wworker:%_, nStartSendTime:%_, nReadWriteTimeOut:%_",
+                    first->task.taskId, (void *) first->runningId, first->transferProfile.startSendTime / 1000,
+                    first->transferProfile.readWriteTimeout / 1000);
             err_type = kEctHttp;
             socket_timeout_code = kEctHttpReadWriteTimeout;
-        } else if (first->running_id && 0 < first->transfer_profile.start_send_time && 0 == first->transfer_profile.last_receive_pkg_time && cur_time - first->transfer_profile.start_send_time >= first->transfer_profile.first_pkg_timeout) {
-            xerror2(TSF"task first-pkg timeout taskid:%_, wworker:%_, nStartSendTime:%_, nfirstpkgtimeout:%_", first->task.taskid, (void*)first->running_id, first->transfer_profile.start_send_time / 1000, first->transfer_profile.first_pkg_timeout / 1000);
+        } else if (first->runningId && 0 < first->transferProfile.startSendTime &&
+                   0 == first->transferProfile.lastReceivePkgTime &&
+                   cur_time - first->transferProfile.startSendTime >= first->transferProfile.firstPkgTimeout) {
+            xerror2(TSF"task first-pkg timeout taskId:%_, wworker:%_, nStartSendTime:%_, nfirstpkgtimeout:%_",
+                    first->task.taskId, (void *) first->runningId, first->transferProfile.startSendTime / 1000,
+                    first->transferProfile.firstPkgTimeout / 1000);
             err_type = kEctHttp;
             socket_timeout_code = kEctHttpFirstPkgTimeout;
-        } else if (first->running_id && 0 < first->transfer_profile.start_send_time && 0 < first->transfer_profile.last_receive_pkg_time &&
-                cur_time - first->transfer_profile.last_receive_pkg_time >= ((kMobile != getNetInfo()) ? kWifiPackageInterval : kGPRSPackageInterval)) {
-            xerror2(TSF"task pkg-pkg timeout, taskid:%_, wworker:%_, nLastRecvTime:%_, pkg-pkg timeout:%_",
-                    first->task.taskid, (void*)first->running_id, first->transfer_profile.last_receive_pkg_time / 1000, ((kMobile != getNetInfo()) ? kWifiPackageInterval : kGPRSPackageInterval) / 1000);
+        } else if (first->runningId && 0 < first->transferProfile.startSendTime &&
+                   0 < first->transferProfile.lastReceivePkgTime &&
+                   cur_time - first->transferProfile.lastReceivePkgTime >=
+                   ((kMobile != getNetInfo()) ? kWifiPackageInterval : kGPRSPackageInterval)) {
+            xerror2(TSF"task pkg-pkg timeout, taskId:%_, wworker:%_, nLastRecvTime:%_, pkg-pkg timeout:%_",
+                    first->task.taskId, (void *) first->runningId,
+                    first->transferProfile.lastReceivePkgTime / 1000,
+                    ((kMobile != getNetInfo()) ? kWifiPackageInterval : kGPRSPackageInterval) / 1000);
             err_type = kEctHttp;
             socket_timeout_code = kEctHttpPkgPkgTimeout;
         } else {
@@ -207,14 +224,17 @@ void ShortLinkTaskManager::__RunOnTimeout() {
         }
 
         if (0 != socket_timeout_code) {
-            std::string ip = first->running_id ? ((ShortLinkInterface*)first->running_id)->Profile().ip : "";
-            std::string host = first->running_id ? ((ShortLinkInterface*)first->running_id)->Profile().host : "";
-            int port = first->running_id ? ((ShortLinkInterface*)first->running_id)->Profile().port : 0;
-            dynamic_timeout_.CgiTaskStatistic(first->task.cgi, kDynTimeTaskFailedPkgLen, 0);
+            std::string ip = first->runningId ? ((ShortLinkInterface *) first->runningId)->Profile().ip : "";
+            std::string host = first->runningId ? ((ShortLinkInterface *) first->runningId)->Profile().host : "";
+            int port = first->runningId ? ((ShortLinkInterface *) first->runningId)->Profile().port : 0;
+            mDynamicTimeout.CgiTaskStatistic(first->task.cgi, kDynTimeTaskFailedPkgLen, 0);
             __SetLastFailedStatus(first);
-            __SingleRespHandle(first, err_type, socket_timeout_code, err_type == kEctLocal ? kTaskFailHandleTaskTimeout : kTaskFailHandleDefault, 0, first->running_id ? ((ShortLinkInterface*)first->running_id)->Profile() : ConnectProfile());
-            xassert2(fun_notify_network_err_);
-            fun_notify_network_err_(__LINE__, err_type, socket_timeout_code, ip, host, port);
+            __SingleRespHandle(first, err_type, socket_timeout_code,
+                               err_type == kEctLocal ? kTaskFailHandleTaskTimeout : kTaskFailHandleDefault, 0,
+                               first->runningId ? ((ShortLinkInterface *) first->runningId)->Profile()
+                                                 : ConnectProfile());
+            xassert2(NotifyNetworkErrorHook);
+            NotifyNetworkErrorHook(__LINE__, err_type, socket_timeout_code, ip, host, port);
         }
 
         first = next;
@@ -222,8 +242,8 @@ void ShortLinkTaskManager::__RunOnTimeout() {
 }
 
 void ShortLinkTaskManager::__RunOnStartTask() {
-    std::list<TaskProfile>::iterator first = lst_cmd_.begin();
-    std::list<TaskProfile>::iterator last = lst_cmd_.end();
+    std::list<TaskProfile>::iterator first = mTaskList.begin();
+    std::list<TaskProfile>::iterator last = mTaskList.end();
 
     bool ismakesureauthruned = false;
     bool ismakesureauthsuccess = false;
@@ -234,21 +254,22 @@ void ShortLinkTaskManager::__RunOnStartTask() {
         std::list<TaskProfile>::iterator next = first;
         ++next;
 
-        if (first->running_id) {
+        if (first->runningId) {
             ++sent_count;
             first = next;
             continue;
         }
 
         //重试间隔
-        if (first->retry_time_interval > curtime - first->retry_start_time) {
-            xdebug2(TSF"retry interval, taskid:%0, task retry late task, wait:%1", first->task.taskid, (curtime - first->transfer_profile.loop_start_task_time) / 1000);
+        if (first->retryTimeInterval > curtime - first->retryStartTime) {
+            xdebug2(TSF"retry interval, taskId:%0, task retry late task, wait:%1", first->task.taskId,
+                    (curtime - first->transferProfile.loopStartTaskTime) / 1000);
             first = next;
             continue;
         }
 
         // make sure login
-        if (first->task.need_authed) {
+        if (first->task.needAuthed) {
 
             if (!ismakesureauthruned) {
                 ismakesureauthruned = true;
@@ -266,338 +287,391 @@ void ShortLinkTaskManager::__RunOnStartTask() {
         AutoBuffer buffer_extension;
         int error_code = 0;
 
-        if (!Req2Buf(first->task.taskid, first->task.user_context, bufreq, buffer_extension, error_code, Task::kChannelShort)) {
-            __SingleRespHandle(first, kEctEnDecode, error_code, kTaskFailHandleTaskEnd, 0, first->running_id ? ((ShortLinkInterface*)first->running_id)->Profile() : ConnectProfile());
+        if (!Req2Buf(first->task.taskId, first->task.userContext, bufreq, buffer_extension, error_code,
+                     Task::kChannelShort)) {
+            __SingleRespHandle(first, kEctEnDecode, error_code, kTaskFailHandleTaskEnd, 0,
+                               first->runningId ? ((ShortLinkInterface *) first->runningId)->Profile()
+                                                 : ConnectProfile());
             first = next;
             continue;
         }
 
         //雪崩检测
-        xassert2(fun_anti_avalanche_check_);
+        xassert2(AntiAvalancheCheckHook);
 
-        if (!fun_anti_avalanche_check_(first->task, bufreq.Ptr(), (int)bufreq.Length())) {
-            __SingleRespHandle(first, kEctLocal, kEctLocalAntiAvalanche, kTaskFailHandleTaskEnd, 0, first->running_id ? ((ShortLinkInterface*)first->running_id)->Profile() : ConnectProfile());
+        if (!AntiAvalancheCheckHook(first->task, bufreq.Ptr(), (int) bufreq.Length())) {
+            __SingleRespHandle(first, kEctLocal, kEctLocalAntiAvalanche, kTaskFailHandleTaskEnd, 0,
+                               first->runningId ? ((ShortLinkInterface *) first->runningId)->Profile()
+                                                 : ConnectProfile());
             first = next;
             continue;
         }
 
-        first->transfer_profile.loop_start_task_time = ::gettickcount();
-        first->transfer_profile.first_pkg_timeout = __FirstPkgTimeout(first->task.server_process_cost, bufreq.Length(), sent_count, dynamic_timeout_.GetStatus());
-        first->current_dyntime_status = (first->task.server_process_cost <= 0) ? dynamic_timeout_.GetStatus() : kEValuating;
-        first->transfer_profile.read_write_timeout = __ReadWriteTimeout(first->transfer_profile.first_pkg_timeout);
-        first->transfer_profile.send_data_size = bufreq.Length();
+        first->transferProfile.loopStartTaskTime = ::gettickcount();
+        first->transferProfile.firstPkgTimeout = __FirstPkgTimeout(first->task.serverProcessCost, bufreq.Length(),
+                                                                      sent_count, mDynamicTimeout.GetStatus());
+        first->currentDyntimeStatus = (first->task.serverProcessCost <= 0) ? mDynamicTimeout.GetStatus()
+                                                                               : kEValuating;
+        first->transferProfile.readWriteTimeout = __ReadWriteTimeout(first->transferProfile.firstPkgTimeout);
+        first->transferProfile.sendDataSize = bufreq.Length();
 
-        first->use_proxy =  (first->remain_retry_count == 0 && first->task.retry_count > 0) ? !default_use_proxy_ : default_use_proxy_;
-        ShortLinkInterface* worker = ShortLinkChannelFactory::Create(MessageQueue::Handler2Queue(asyncreg_.Get()), net_source_, first->task, first->use_proxy);
+        first->useProxy = (first->remainRetryCount == 0 && first->task.retryCount > 0) ? !mDefaultUseProxy
+                                                                                           : mDefaultUseProxy;
+        ShortLinkInterface *worker = ShortLinkChannelFactory::Create(MessageQueue::Handler2Queue(mAsyncReg.Get()),
+                                                                     mNetSource, first->task, first->useProxy);
         worker->OnSend.set(boost::bind(&ShortLinkTaskManager::__OnSend, this, _1), AYNC_HANDLER);
         worker->OnRecv.set(boost::bind(&ShortLinkTaskManager::__OnRecv, this, _1, _2, _3), AYNC_HANDLER);
-        worker->OnResponse.set(boost::bind(&ShortLinkTaskManager::__OnResponse, this, _1, _2, _3, _4, _5, _6, _7), AYNC_HANDLER);
-        first->running_id = (intptr_t)worker;
+        worker->OnResponse.set(boost::bind(&ShortLinkTaskManager::__OnResponse, this, _1, _2, _3, _4, _5, _6, _7),
+                               AYNC_HANDLER);
+        first->runningId = (intptr_t) worker;
 
-        xassert2(worker && first->running_id);
-        if (!first->running_id) {
-            xwarn2(TSF"task add into shortlink readwrite fail cgi:%_, cmdid:%_, taskid:%_", first->task.cgi, first->task.cmdid, first->task.taskid);
+        xassert2(worker && first->runningId);
+        if (!first->runningId) {
+            xwarn2(TSF"task add into shortlink readwrite fail cgi:%_, cmdid:%_, taskId:%_", first->task.cgi,
+                   first->task.cmdId, first->task.taskId);
             first = next;
             continue;
         }
 
-        worker->func_network_report.set(fun_notify_network_err_);
+        worker->OnNetReport.set(NotifyNetworkErrorHook);
         worker->SendRequest(bufreq, buffer_extension);
 
-        xinfo2(TSF"task add into shortlink readwrite cgi:%_, cmdid:%_, taskid:%_, work:%_, size:%_, timeout(firstpkg:%_, rw:%_, task:%_), retry:%_, useProxy:%_",
-               first->task.cgi, first->task.cmdid, first->task.taskid, (ShortLinkInterface*)first->running_id, first->transfer_profile.send_data_size, first->transfer_profile.first_pkg_timeout / 1000,
-               first->transfer_profile.read_write_timeout / 1000, first->task_timeout / 1000, first->remain_retry_count, first->use_proxy);
+        xinfo2(TSF"task add into shortlink readwrite cgi:%_, cmdid:%_, taskId:%_, work:%_, size:%_, timeout(firstpkg:%_, rw:%_, task:%_), retry:%_, useProxy:%_",
+               first->task.cgi, first->task.cmdId, first->task.taskId, (ShortLinkInterface *) first->runningId,
+               first->transferProfile.sendDataSize, first->transferProfile.firstPkgTimeout / 1000,
+               first->transferProfile.readWriteTimeout / 1000, first->taskTimeout / 1000, first->remainRetryCount,
+               first->useProxy);
         ++sent_count;
         first = next;
     }
 }
 
 struct find_seq {
-  public:
-    bool operator()(const TaskProfile& _value) {return p_worker == (ShortLinkInterface*)_value.running_id;}
+public:
+    bool operator()(const TaskProfile &value) { return p_worker == (ShortLinkInterface *) value.runningId; }
 
-  public:
-    ShortLinkInterface* p_worker;
+public:
+    ShortLinkInterface *p_worker;
 };
 
-void ShortLinkTaskManager::__OnResponse(ShortLinkInterface* _worker, ErrCmdType _err_type, int _status, AutoBuffer& _body, AutoBuffer& _extension, bool _cancel_retry, ConnectProfile& _conn_profile) {
+void
+ShortLinkTaskManager::__OnResponse(ShortLinkInterface *worker, ErrCmdType errType, int status, AutoBuffer &body,
+                                   AutoBuffer &extension, bool cancelRetry, ConnectProfile &connProfile) {
 
-    xdebug2(TSF"worker=%0, _err_type=%1, _status=%2, _body.lenght=%3, _cancel_retry=%4", _worker, _err_type, _status, _body.Length(), _cancel_retry);
+    xdebug2(TSF"worker=%0, errType=%1, status=%2, body.lenght=%3, cancelRetry=%4", worker, errType,
+            status, body.Length(), cancelRetry);
 
-    fun_shortlink_response_(_status);
+    ShortLinkRspHook(status);
 
-    std::list<TaskProfile>::iterator it = __LocateBySeq((intptr_t)_worker);    // must used iter pWorker, not used aSelf. aSelf may be destroy already
+    std::list<TaskProfile>::iterator it = __LocateBySeq(
+            (intptr_t) worker);    // must used iter pWorker, not used aSelf. aSelf may be destroy already
 
-    if (lst_cmd_.end() == it) {
-        xerror2(TSF"task no found: status:%_, worker:%_", _status, _worker);
+    if (mTaskList.end() == it) {
+        xerror2(TSF"task no found: status:%_, worker:%_", status, worker);
         return;
     }
 
-    if (_err_type != kEctOK) {
-        if (_err_type == kEctSocket && _status == kEctSocketMakeSocketPrepared) {
-            dynamic_timeout_.CgiTaskStatistic(it->task.cgi, kDynTimeTaskFailedPkgLen, 0);
+    if (errType != kEctOK) {
+        if (errType == kEctSocket && status == kEctSocketMakeSocketPrepared) {
+            mDynamicTimeout.CgiTaskStatistic(it->task.cgi, kDynTimeTaskFailedPkgLen, 0);
             __SetLastFailedStatus(it);
         }
 
-        if (_err_type == kEctSocket) {
-            it->force_no_retry = _cancel_retry;
+        if (errType == kEctSocket) {
+            it->forceNoRetry = cancelRetry;
         }
-        __SingleRespHandle(it, _err_type, _status, kTaskFailHandleDefault, _body.Length(), _conn_profile);
+        __SingleRespHandle(it, errType, status, kTaskFailHandleDefault, body.Length(), connProfile);
         return;
 
     }
 
-    it->transfer_profile.received_size = _body.Length();
-    it->transfer_profile.receive_data_size = _body.Length();
-    it->transfer_profile.last_receive_pkg_time = ::gettickcount();
+    it->transferProfile.receivedSize = body.Length();
+    it->transferProfile.receiveDataSize = body.Length();
+    it->transferProfile.lastReceivePkgTime = ::gettickcount();
 
     int err_code = 0;
-    int handle_type = Buf2Resp(it->task.taskid, it->task.user_context, _body, _extension, err_code, Task::kChannelShort);
+    int handle_type = Buf2Resp(it->task.taskId, it->task.userContext, body, extension, err_code,
+                               Task::kChannelShort);
 
-    switch(handle_type){
-        case kTaskFailHandleNoError:
-        {
-            dynamic_timeout_.CgiTaskStatistic(it->task.cgi, (unsigned int)it->transfer_profile.send_data_size + (unsigned int)_body.Length(), ::gettickcount() - it->transfer_profile.start_send_time);
-            __SingleRespHandle(it, kEctOK, err_code, handle_type, (unsigned int)it->transfer_profile.receive_data_size, _conn_profile);
-            xassert2(fun_notify_network_err_);
-            fun_notify_network_err_(__LINE__, kEctOK, err_code, _conn_profile.ip, _conn_profile.host, _conn_profile.port);
+    switch (handle_type) {
+        case kTaskFailHandleNoError: {
+            mDynamicTimeout.CgiTaskStatistic(it->task.cgi, (unsigned int) it->transferProfile.sendDataSize +
+                                                            (unsigned int) body.Length(),
+                                              ::gettickcount() - it->transferProfile.startSendTime);
+            __SingleRespHandle(it, kEctOK, err_code, handle_type, (unsigned int) it->transferProfile.receiveDataSize,
+                               connProfile);
+            xassert2(NotifyNetworkErrorHook);
+            NotifyNetworkErrorHook(__LINE__, kEctOK, err_code, connProfile.ip, connProfile.host,
+                                    connProfile.port);
         }
             break;
-        case kTaskFailHandleSessionTimeout:
-        {
-            xassert2(fun_notify_retry_all_tasks);
-            xwarn2(TSF"task decode error session timeout taskid:%_, cmdid:%_, cgi:%_", it->task.taskid, it->task.cmdid, it->task.cgi);
-            fun_notify_retry_all_tasks(kEctEnDecode, err_code, handle_type, it->task.taskid);
+        case kTaskFailHandleSessionTimeout: {
+            xassert2(NotifyRetryAllTasksHook);
+            xwarn2(TSF"task decode error session timeout taskId:%_, cmdid:%_, cgi:%_", it->task.taskId,
+                   it->task.cmdId, it->task.cgi);
+            NotifyRetryAllTasksHook(kEctEnDecode, err_code, handle_type, it->task.taskId);
         }
             break;
-        case kTaskFailHandleRetryAllTasks:
-        {
-            xassert2(fun_notify_retry_all_tasks);
-            xwarn2(TSF"task decode error retry all task taskid:%_, cmdid:%_, cgi:%_", it->task.taskid, it->task.cmdid, it->task.cgi);
-            fun_notify_retry_all_tasks(kEctEnDecode, err_code, handle_type, it->task.taskid);
+        case kTaskFailHandleRetryAllTasks: {
+            xassert2(NotifyRetryAllTasksHook);
+            xwarn2(TSF"task decode error retry all task taskId:%_, cmdid:%_, cgi:%_", it->task.taskId,
+                   it->task.cmdId, it->task.cgi);
+            NotifyRetryAllTasksHook(kEctEnDecode, err_code, handle_type, it->task.taskId);
         }
             break;
-        case kTaskFailHandleTaskEnd:
-        {
-            __SingleRespHandle(it, kEctEnDecode, err_code, handle_type, (unsigned int)it->transfer_profile.receive_data_size, _conn_profile);
+        case kTaskFailHandleTaskEnd: {
+            __SingleRespHandle(it, kEctEnDecode, err_code, handle_type,
+                               (unsigned int) it->transferProfile.receiveDataSize, connProfile);
         }
             break;
-        case kTaskFailHandleDefault:
-        {
-            xerror2(TSF"task decode error handle_type:%_, err_code:%_, pWorker:%_, taskid:%_ body dump:%_", handle_type, err_code, (void*)it->running_id, it->task.taskid, xdump(_body.Ptr(), _body.Length()));
-            __SingleRespHandle(it, kEctEnDecode, err_code, handle_type, (unsigned int)it->transfer_profile.receive_data_size, _conn_profile);
-            xassert2(fun_notify_network_err_);
-            fun_notify_network_err_(__LINE__, kEctEnDecode, handle_type, _conn_profile.ip, _conn_profile.host, _conn_profile.port);
+        case kTaskFailHandleDefault: {
+            xerror2(TSF"task decode error handle_type:%_, err_code:%_, pWorker:%_, taskId:%_ body dump:%_",
+                    handle_type, err_code, (void *) it->runningId, it->task.taskId,
+                    xdump(body.Ptr(), body.Length()));
+            __SingleRespHandle(it, kEctEnDecode, err_code, handle_type,
+                               (unsigned int) it->transferProfile.receiveDataSize, connProfile);
+            xassert2(NotifyNetworkErrorHook);
+            NotifyNetworkErrorHook(__LINE__, kEctEnDecode, handle_type, connProfile.ip, connProfile.host,
+                                    connProfile.port);
         }
             break;
-        default:
-        {
-            xassert2(false, TSF"task decode error fail_handle:%_, taskid:%_", handle_type, it->task.taskid);
-            __SingleRespHandle(it, kEctEnDecode, err_code, handle_type, (unsigned int)it->transfer_profile.receive_data_size, _conn_profile);
-            xassert2(fun_notify_network_err_);
-            fun_notify_network_err_(__LINE__, kEctEnDecode, handle_type, _conn_profile.ip, _conn_profile.host, _conn_profile.port);
+        default: {
+            xassert2(false, TSF"task decode error fail_handle:%_, taskId:%_", handle_type, it->task.taskId);
+            __SingleRespHandle(it, kEctEnDecode, err_code, handle_type,
+                               (unsigned int) it->transferProfile.receiveDataSize, connProfile);
+            xassert2(NotifyNetworkErrorHook);
+            NotifyNetworkErrorHook(__LINE__, kEctEnDecode, handle_type, connProfile.ip, connProfile.host,
+                                    connProfile.port);
             break;
         }
 
     }
 }
 
-void ShortLinkTaskManager::__OnSend(ShortLinkInterface* _worker) {
-    
-    std::list<TaskProfile>::iterator it = __LocateBySeq((intptr_t)_worker);
+void ShortLinkTaskManager::__OnSend(ShortLinkInterface *worker) {
 
-    if (lst_cmd_.end() != it) {
-        if (it->transfer_profile.first_start_send_time == 0)
-            it->transfer_profile.first_start_send_time = ::gettickcount();
-        it->transfer_profile.start_send_time = ::gettickcount();
-        xdebug2(TSF"taskid:%_, worker:%_, nStartSendTime:%_", it->task.taskid, _worker, it->transfer_profile.start_send_time / 1000);
+    std::list<TaskProfile>::iterator it = __LocateBySeq((intptr_t) worker);
+
+    if (mTaskList.end() != it) {
+        if (it->transferProfile.firstStartSendTime == 0)
+            it->transferProfile.firstStartSendTime = ::gettickcount();
+        it->transferProfile.startSendTime = ::gettickcount();
+        xdebug2(TSF"taskId:%_, worker:%_, nStartSendTime:%_", it->task.taskId, worker,
+                it->transferProfile.startSendTime / 1000);
     }
 }
 
-void ShortLinkTaskManager::__OnRecv(ShortLinkInterface* _worker, unsigned int _cached_size, unsigned int _total_size) {
+void ShortLinkTaskManager::__OnRecv(ShortLinkInterface *worker, unsigned int cachedSize, unsigned int totalSize) {
 
     xverbose_function();
-    std::list<TaskProfile>::iterator it = __LocateBySeq((intptr_t)_worker);
+    std::list<TaskProfile>::iterator it = __LocateBySeq((intptr_t) worker);
 
-    if (lst_cmd_.end() != it) {
-        if(it->transfer_profile.last_receive_pkg_time == 0)
-            WeakNetworkLogic::Singleton::Instance()->OnPkgEvent(true, (int)(::gettickcount() - it->transfer_profile.start_send_time));
+    if (mTaskList.end() != it) {
+        if (it->transferProfile.lastReceivePkgTime == 0)
+            WeakNetworkLogic::Singleton::Instance()->OnPkgEvent(true, (int) (::gettickcount() -
+                                                                             it->transferProfile.startSendTime));
         else
-            WeakNetworkLogic::Singleton::Instance()->OnPkgEvent(false, (int)(::gettickcount() - it->transfer_profile.last_receive_pkg_time));
-        it->transfer_profile.last_receive_pkg_time = ::gettickcount();
-        it->transfer_profile.received_size = _cached_size;
-        it->transfer_profile.receive_data_size = _total_size;
-        xdebug2(TSF"worker:%_, last_recvtime:%_, cachedsize:%_, totalsize:%_", _worker, it->transfer_profile.last_receive_pkg_time / 1000, _cached_size, _total_size);
+            WeakNetworkLogic::Singleton::Instance()->OnPkgEvent(false, (int) (::gettickcount() -
+                                                                              it->transferProfile.lastReceivePkgTime));
+        it->transferProfile.lastReceivePkgTime = ::gettickcount();
+        it->transferProfile.receivedSize = cachedSize;
+        it->transferProfile.receiveDataSize = totalSize;
+        xdebug2(TSF"worker:%_, last_recvtime:%_, cachedsize:%_, totalsize:%_", worker,
+                it->transferProfile.lastReceivePkgTime / 1000, cachedSize, totalSize);
     } else {
-        xwarn2(TSF"not found worker:%_", _worker);
+        xwarn2(TSF"not found worker:%_", worker);
     }
 }
 
 void ShortLinkTaskManager::RedoTasks() {
     xinfo_function();
 
-    std::list<TaskProfile>::iterator first = lst_cmd_.begin();
-    std::list<TaskProfile>::iterator last = lst_cmd_.end();
+    std::list<TaskProfile>::iterator first = mTaskList.begin();
+    std::list<TaskProfile>::iterator last = mTaskList.end();
 
     while (first != last) {
         std::list<TaskProfile>::iterator next = first;
         ++next;
 
-        first->last_failed_dyntime_status = 0;
+        first->lastFailedDyntimeStatus = 0;
 
-        if (first->running_id) {
-            xinfo2(TSF "task redo, taskid:%_", first->task.taskid);
-            __SingleRespHandle(first, kEctLocal, kEctLocalCancel, kTaskFailHandleDefault, 0, ((ShortLinkInterface*)first->running_id)->Profile());
+        if (first->runningId) {
+            xinfo2(TSF"task redo, taskId:%_", first->task.taskId);
+            __SingleRespHandle(first, kEctLocal, kEctLocalCancel, kTaskFailHandleDefault, 0,
+                               ((ShortLinkInterface *) first->runningId)->Profile());
         }
 
         first = next;
     }
-    
+
     __RunLoop();
 }
 
-void ShortLinkTaskManager::RetryTasks(ErrCmdType _err_type, int _err_code, int _fail_handle, uint32_t _src_taskid) {
+void ShortLinkTaskManager::RetryTasks(ErrCmdType errType, int errCode, int failHandle, uint32_t srcTaskId) {
     xverbose_function();
-    __BatchErrorRespHandle(_err_type, _err_code, _fail_handle, _src_taskid);
-    __RunLoop(); 
+    __BatchErrorRespHandle(errType, errCode, failHandle, srcTaskId);
+    __RunLoop();
 }
 
-void ShortLinkTaskManager::__BatchErrorRespHandle(ErrCmdType _err_type, int _err_code, int _fail_handle, uint32_t _src_taskid, bool _callback_runing_task_only) {
-    xassert2(kEctOK != _err_type);
-    xdebug2(TSF"ect=%0, errcode=%1", _err_type, _err_code);
+void ShortLinkTaskManager::__BatchErrorRespHandle(ErrCmdType errType, int errCode, int failHandle,
+                                                  uint32_t srcTaskId, bool callbackRunningTaskOnly) {
+    xassert2(kEctOK != errType);
+    xdebug2(TSF"ect=%0, errcode=%1", errType, errCode);
 
-    std::list<TaskProfile>::iterator first = lst_cmd_.begin();
-    std::list<TaskProfile>::iterator last = lst_cmd_.end();
+    std::list<TaskProfile>::iterator first = mTaskList.begin();
+    std::list<TaskProfile>::iterator last = mTaskList.end();
 
     while (first != last) {
         std::list<TaskProfile>::iterator next = first;
         ++next;
-        
-        if (_callback_runing_task_only && !first->running_id) {
+
+        if (callbackRunningTaskOnly && !first->runningId) {
             first = next;
             continue;
         }
-        
-        if (_fail_handle == kTaskFailHandleSessionTimeout && !first->task.need_authed) {
+
+        if (failHandle == kTaskFailHandleSessionTimeout && !first->task.needAuthed) {
             first = next;
             continue;
         }
-        
-        if (_src_taskid == Task::kInvalidTaskID || _src_taskid == first->task.taskid)
-            __SingleRespHandle(first, _err_type, _err_code, _fail_handle, 0, first->running_id ? ((ShortLinkInterface*)first->running_id)->Profile() : ConnectProfile());
+
+        if (srcTaskId == Task::kInvalidTaskID || srcTaskId == first->task.taskId)
+            __SingleRespHandle(first, errType, errCode, failHandle, 0,
+                               first->runningId ? ((ShortLinkInterface *) first->runningId)->Profile()
+                                                 : ConnectProfile());
         else
-            __SingleRespHandle(first, _err_type, 0, _fail_handle, 0, first->running_id ? ((ShortLinkInterface*)first->running_id)->Profile() : ConnectProfile());
+            __SingleRespHandle(first, errType, 0, failHandle, 0,
+                               first->runningId ? ((ShortLinkInterface *) first->runningId)->Profile()
+                                                 : ConnectProfile());
 
         first = next;
     }
 }
 
-bool ShortLinkTaskManager::__SingleRespHandle(std::list<TaskProfile>::iterator _it, ErrCmdType _err_type, int _err_code, int _fail_handle, size_t _resp_length, const ConnectProfile& _connect_profile) {
+bool ShortLinkTaskManager::__SingleRespHandle(std::list<TaskProfile>::iterator it, ErrCmdType errType, int errCode,
+                                              int failHandle, size_t _resp_length,
+                                              const ConnectProfile &connectProfile) {
     xverbose_function();
-    xassert2(kEctServer != _err_type);
-    xassert2(_it != lst_cmd_.end());
-    
-    if(_it == lst_cmd_.end()) return false;
+    xassert2(kEctServer != errType);
+    xassert2(it != mTaskList.end());
 
-    if (kEctOK == _err_type) {
-        tasks_continuous_fail_count_ = 0;
-        default_use_proxy_ = _it->use_proxy;
+    if (it == mTaskList.end()) return false;
+
+    if (kEctOK == errType) {
+        mTasksContinuousFailCount = 0;
+        mDefaultUseProxy = it->useProxy;
     } else {
-        ++tasks_continuous_fail_count_;
+        ++mTasksContinuousFailCount;
     }
 
-    uint64_t curtime =  gettickcount();
-    _it->transfer_profile.connect_profile = _connect_profile;
-    
-    xassert2((kEctOK == _err_type) == (kTaskFailHandleNoError == _fail_handle), TSF"type:%_, handle:%_", _err_type, _fail_handle);
+    uint64_t curtime = gettickcount();
+    it->transferProfile.connectProfile = connectProfile;
 
-    if (_it->force_no_retry || 0 >= _it->remain_retry_count || kEctOK == _err_type || kTaskFailHandleTaskEnd == _fail_handle || kTaskFailHandleTaskTimeout == _fail_handle) {
-        xlog2(kEctOK == _err_type ? kLevelInfo : kLevelWarn, TSF"task end callback short cmdid:%_, err(%_, %_, %_), ", _it->task.cmdid, _err_type, _err_code, _fail_handle)
-        (TSF"svr(%_:%_, %_, %_), ", _connect_profile.ip, _connect_profile.port, IPSourceTypeString[_connect_profile.ip_type], _connect_profile.host)
-        (TSF"cli(%_, %_, n:%_, sig:%_), ", _it->transfer_profile.external_ip, _connect_profile.local_ip, _connect_profile.net_type, _connect_profile.disconn_signal)
-        (TSF"cost(s:%_, r:%_%_%_, c:%_, rw:%_), all:%_, retry:%_, ", _it->transfer_profile.send_data_size, 0 != _resp_length ? _resp_length : _it->transfer_profile.receive_data_size, 0 != _resp_length ? "" : "/",
-                0 != _resp_length ? "" : string_cast(_it->transfer_profile.received_size).str(), _connect_profile.conn_rtt, (_it->transfer_profile.start_send_time == 0 ? 0 : curtime - _it->transfer_profile.start_send_time),
-                        (curtime - _it->start_task_time), _it->remain_retry_count)
-        (TSF"cgi:%_, taskid:%_, worker:%_", _it->task.cgi, _it->task.taskid, (ShortLinkInterface*)_it->running_id);
+    xassert2((kEctOK == errType) == (kTaskFailHandleNoError == failHandle), TSF"type:%_, handle:%_", errType, failHandle);
 
-        int cgi_retcode = fun_callback_(_err_type, _err_code, _fail_handle, _it->task, (unsigned int)(curtime - _it->start_task_time));
-        int errcode = _err_code;
+    if (it->forceNoRetry || 0 >= it->remainRetryCount || kEctOK == errType ||
+        kTaskFailHandleTaskEnd == failHandle || kTaskFailHandleTaskTimeout == failHandle) {
+        xlog2(kEctOK == errType ? kLevelInfo : kLevelWarn, TSF"task end callback short cmdid:%_, err(%_, %_, %_), ", it->task.cmdId, errType, errCode,
+              failHandle)
+            (TSF "svr(%_:%_, %_, %_), ", connectProfile.ip, connectProfile.port,
+             IPSourceTypeString[connectProfile.ipType], connectProfile.host)
+                    (TSF "cli(%_, %_, n:%_, sig:%_), ", it->transferProfile.externalIp, connectProfile.localIp,
+                     connectProfile.netType, connectProfile.disconnSignal)
+                    (TSF "cost(s:%_, r:%_%_%_, c:%_, rw:%_), all:%_, retry:%_, ", it->transferProfile.sendDataSize,
+                     0 != _resp_length ? _resp_length : it->transferProfile.receiveDataSize,
+                     0 != _resp_length ? "" : "/",
+                     0 != _resp_length ? "" : string_cast(it->transferProfile.receivedSize).str(),
+                     connectProfile.connRtt,
+                     (it->transferProfile.startSendTime == 0 ? 0 : curtime - it->transferProfile.startSendTime),
+                     (curtime - it->startTaskTime), it->remainRetryCount)
+                    (TSF "cgi:%_, taskId:%_, worker:%_", it->task.cgi, it->task.taskId,
+                     (ShortLinkInterface *) it->runningId);
 
-        if (_it->running_id) {
-            if (kEctOK == _err_type) {
+        int cgi_retcode = CallResultHook(errType, errCode, failHandle, it->task,
+                                        (unsigned int) (curtime - it->startTaskTime));
+        int errcode = errCode;
+
+        if (it->runningId) {
+            if (kEctOK == errType) {
                 errcode = cgi_retcode;
             }
         }
 
-        _it->end_task_time = ::gettickcount();
-        _it->err_type = _err_type;
-        _it->transfer_profile.error_type = _err_type;
-        _it->err_code = errcode;
-        _it->transfer_profile.error_code = _err_code;
-        _it->PushHistory();
-        ReportTaskProfile(*_it);
-        WeakNetworkLogic::Singleton::Instance()->OnTaskEvent(*_it);
+        it->endTaskTime = ::gettickcount();
+        it->errType = errType;
+        it->transferProfile.errorType = errType;
+        it->errCode = errcode;
+        it->transferProfile.errorCode = errCode;
+        it->PushHistory();
+        ReportTaskProfile(*it);
+        WeakNetworkLogic::Singleton::Instance()->OnTaskEvent(*it);
 
-        __DeleteShortLink(_it->running_id);
+        __DeleteShortLink(it->runningId);
 
-        lst_cmd_.erase(_it);
+        mTaskList.erase(it);
 
         return true;
     }
 
 
-    xlog2(kEctOK == _err_type ? kLevelInfo : kLevelWarn, TSF"task end retry short cmdid:%_, err(%_, %_, %_), ", _it->task.cmdid, _err_type, _err_code, _fail_handle)
-    (TSF"svr(%_:%_, %_, %_), ", _connect_profile.ip, _connect_profile.port, IPSourceTypeString[_connect_profile.ip_type], _connect_profile.host)
-    (TSF"cli(%_, n:%_, sig:%_), ", _connect_profile.local_ip, _connect_profile.net_type, _connect_profile.disconn_signal)
-    (TSF"cost(s:%_, r:%_%_%_, c:%_, rw:%_), all:%_, retry:%_, ", _it->transfer_profile.send_data_size, 0 != _resp_length ? _resp_length : _it->transfer_profile.received_size,
-            0 != _resp_length ? "" : "/", 0 != _resp_length ? "" : string_cast(_it->transfer_profile.receive_data_size).str(), _connect_profile.conn_rtt,
-                    (_it->transfer_profile.start_send_time == 0 ? 0 : curtime - _it->transfer_profile.start_send_time), (curtime - _it->start_task_time), _it->remain_retry_count)
-    (TSF"cgi:%_, taskid:%_, worker:%_", _it->task.cgi, _it->task.taskid,(void*) _it->running_id);
+    xlog2(kEctOK == errType ? kLevelInfo : kLevelWarn, TSF"task end retry short cmdid:%_, err(%_, %_, %_), ", it->task.cmdId, errType, errCode, failHandle)
+        (TSF "svr(%_:%_, %_, %_), ", connectProfile.ip, connectProfile.port,
+         IPSourceTypeString[connectProfile.ipType], connectProfile.host)
+                (TSF "cli(%_, n:%_, sig:%_), ", connectProfile.localIp, connectProfile.netType,
+                 connectProfile.disconnSignal)
+                (TSF "cost(s:%_, r:%_%_%_, c:%_, rw:%_), all:%_, retry:%_, ", it->transferProfile.sendDataSize,
+                 0 != _resp_length ? _resp_length : it->transferProfile.receivedSize,
+                 0 != _resp_length ? "" : "/",
+                 0 != _resp_length ? "" : string_cast(it->transferProfile.receiveDataSize).str(),
+                 connectProfile.connRtt,
+                 (it->transferProfile.startSendTime == 0 ? 0 : curtime - it->transferProfile.startSendTime),
+                 (curtime - it->startTaskTime), it->remainRetryCount)
+                (TSF "cgi:%_, taskId:%_, worker:%_", it->task.cgi, it->task.taskId, (void *) it->runningId);
 
-    _it->remain_retry_count--;
-    _it->transfer_profile.error_type = _err_type;
-    _it->transfer_profile.error_code = _err_code;
+    it->remainRetryCount--;
+    it->transferProfile.errorType = errType;
+    it->transferProfile.errorCode = errCode;
 
-    __DeleteShortLink(_it->running_id);
-    _it->PushHistory();
-    _it->InitSendParam();
+    __DeleteShortLink(it->runningId);
+    it->PushHistory();
+    it->InitSendParam();
 
-    _it->retry_start_time = ::gettickcount();
+    it->retryStartTime = ::gettickcount();
     // session timeout 应该立刻重试
-    if (kTaskFailHandleSessionTimeout == _fail_handle) {
-        _it->retry_start_time = 0;
+    if (kTaskFailHandleSessionTimeout == failHandle) {
+        it->retryStartTime = 0;
     }
 
-    _it->retry_time_interval = DEF_TASK_RETRY_INTERNAL;
+    it->retryTimeInterval = DEF_TASK_RETRY_INTERNAL;
 
     return false;
 }
 
-std::list<TaskProfile>::iterator ShortLinkTaskManager::__LocateBySeq(intptr_t _running_id) {
-    if (!_running_id) return lst_cmd_.end();
+std::list<TaskProfile>::iterator ShortLinkTaskManager::__LocateBySeq(intptr_t runningId) {
+    if (!runningId) return mTaskList.end();
 
     find_seq find_functor;
-    find_functor.p_worker = (ShortLinkInterface*)_running_id;
-    std::list<TaskProfile>::iterator it = std::find_if(lst_cmd_.begin(), lst_cmd_.end(), find_functor);
+    find_functor.p_worker = (ShortLinkInterface *) runningId;
+    std::list<TaskProfile>::iterator it = std::find_if(mTaskList.begin(), mTaskList.end(), find_functor);
 
     return it;
 }
 
-void ShortLinkTaskManager::__DeleteShortLink(intptr_t& _running_id) {
-    if (!_running_id) return;
-    ShortLinkInterface* p_shortlink = (ShortLinkInterface*)_running_id;
+void ShortLinkTaskManager::__DeleteShortLink(intptr_t &runningId) {
+    if (!runningId) return;
+    ShortLinkInterface *p_shortlink = (ShortLinkInterface *) runningId;
     ShortLinkChannelFactory::Destory(p_shortlink);
-    MessageQueue::CancelMessage(asyncreg_.Get(), p_shortlink);
+    MessageQueue::CancelMessage(mAsyncReg.Get(), p_shortlink);
     p_shortlink = NULL;
 }
 
-ConnectProfile ShortLinkTaskManager::GetConnectProfile(uint32_t _taskid) const{
-    std::list<TaskProfile>::const_iterator first = lst_cmd_.begin();
-    std::list<TaskProfile>::const_iterator last = lst_cmd_.end();
-    
+ConnectProfile ShortLinkTaskManager::GetConnectProfile(uint32_t taskId) const {
+    std::list<TaskProfile>::const_iterator first = mTaskList.begin();
+    std::list<TaskProfile>::const_iterator last = mTaskList.end();
+
     while (first != last) {
-        if (_taskid == first->task.taskid) {
-            return ((ShortLinkInterface*)(first->running_id))->Profile();
+        if (taskId == first->task.taskId) {
+            return ((ShortLinkInterface *) (first->runningId))->Profile();
         }
         ++first;
     }

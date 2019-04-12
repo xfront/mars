@@ -53,7 +53,7 @@ class LongLinkObserver2 : public MLongLinkObserver2
 public:
 
     virtual void OnStartSendTime(unsigned int _nSeq) {}
-	virtual void OnResponse(ErrCmdType _type, int _errcode, int _cmdid, unsigned int _seq, AutoBuffer& _body, const LongLinkConnectionInfo& _info) {}
+	virtual void OnResponse(ErrCmdType type, int errCode, int cmdId, unsigned int _seq, AutoBuffer& body, const LongLinkConnectionInfo& _info) {}
     virtual void OnPkgRecvTime(unsigned int _nSeq, unsigned int _cachedsize, unsigned int _totalsize) {}
 };
 

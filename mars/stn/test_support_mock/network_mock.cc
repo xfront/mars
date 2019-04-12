@@ -8,7 +8,7 @@ public:
 	~MMNewSpeedTest();
     
 public:
-	void StartAsyncSpeedTest(const char* _buffer, int _len);
+	void StartAsyncSpeedTest(const char* buffer, int len);
 };
 MMNewSpeedTest::MMNewSpeedTest()
 {
@@ -17,7 +17,7 @@ MMNewSpeedTest::~MMNewSpeedTest()
 {
 
 }
-void MMNewSpeedTest::StartAsyncSpeedTest(const char* _buffer, int _len)
+void MMNewSpeedTest::StartAsyncSpeedTest(const char* buffer, int len)
 {
 }
 
@@ -67,9 +67,9 @@ ErrorLogReport::~ErrorLogReport()
 }
 #include "longlink_speed_test.h"
 
-CMMLongLinkSpeedTestItem::CMMLongLinkSpeedTestItem(const std::string& _ip, unsigned int _port)
-: m_ip(_ip)
-, m_port(_port)
+CMMLongLinkSpeedTestItem::CMMLongLinkSpeedTestItem(const std::string& ip, unsigned int port)
+: m_ip(ip)
+, m_port(port)
 , m_socket(-1)
 , m_state(ELongLinkSpeedTestConnecting)
 , m_beforeConnectTime(0)

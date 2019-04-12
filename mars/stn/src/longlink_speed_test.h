@@ -42,56 +42,66 @@ enum ELongLinkSpeedTestState {
 };
 
 namespace mars {
-    namespace stn {
+namespace stn {
 
 class LongLinkSpeedTestItem {
-  public:
-    LongLinkSpeedTestItem(const std::string& _ip, uint16_t _port);
+public:
+    LongLinkSpeedTestItem(const std::string &ip, uint16_t port);
+
     ~LongLinkSpeedTestItem();
 
-    void HandleFDISSet(SocketSelect& _sel);
-    void HandleSetFD(SocketSelect& _sel);
+    void HandleFDISSet(SocketSelect &_sel);
+
+    void HandleSetFD(SocketSelect &_sel);
 
     int GetSocket();
+
     std::string GetIP();
+
     unsigned int GetPort();
+
     unsigned long GetConnectTime();
+
     int GetState();
 
     void CloseSocket();
 
-  private:
+private:
     int __HandleSpeedTestReq();
+
     int __HandleSpeedTestResp();
 
-  private:
-    std::string ip_;
-    unsigned int port_;
-    SOCKET socket_;
-    int state_;
+private:
+    std::string mIP;
+    unsigned int mPort;
+    SOCKET mSocket;
+    int mState;
 
-    uint64_t before_connect_time_;
-    uint64_t after_connect_time_;
+    uint64_t mBeforeConnectTime;
+    uint64_t mAfterConnectTime;
 
-    AutoBuffer req_ab_;
-    AutoBuffer resp_ab_;
+    AutoBuffer mReqBuf;
+    AutoBuffer mRspBuf;
 };
 
 class LongLinkSpeedTest {
-  public:
-    LongLinkSpeedTest(const boost::shared_ptr<NetSource>& _netsource);
+public:
+    LongLinkSpeedTest(const boost::shared_ptr<NetSource> &netSource);
+
     ~LongLinkSpeedTest();
 
-    bool GetFastestSocket(int& _fdSocket, std::string& _strIp, unsigned int& _port, IPSourceType& _type, unsigned long& _connectMillSec);
+    bool GetFastestSocket(int &_fdSocket, std::string &_strIp, unsigned int &port, IPSourceType &type,
+                          unsigned long &_connectMillSec);
 
     boost::shared_ptr<NetSource> GetNetSource();
-  private:
-    boost::shared_ptr<NetSource> netsource_;
-    SocketBreaker breaker_;
-    SocketSelect selector_;
+
+private:
+    boost::shared_ptr<NetSource> mNetSource;
+    SocketBreaker mBreaker;
+    SocketSelect mSelector;
 };
-        
-    }
+
+}
 }
 
 

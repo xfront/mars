@@ -29,13 +29,9 @@
 
 using namespace mars::sdt;
 
-TcpQuery::TcpQuery(const char* _ip, uint16_t _port, unsigned int _conn_timeout, NetCheckTrafficMonitor* _traffic_monitor)
-    : ip_(strdup(_ip))
-    , port_(_port)
-    , select_(pipe_)
-    , status_(kTcpInit)
-    , errcode_(0)
-    , conn_timeout_(_conn_timeout) {
+TcpQuery::TcpQuery(const char *_ip, uint16_t _port, unsigned int _conn_timeout,
+                   NetCheckTrafficMonitor *_traffic_monitor)
+        : ip_(strdup(_ip)), port_(_port), select_(pipe_), status_(kTcpInit), errcode_(0), conn_timeout_(_conn_timeout) {
     if (!pipe_.IsCreateSuc()) {
         xassert2(false, "TcpQuery create breaker error.");
         status_ = kTcpInitErr;
@@ -60,7 +56,7 @@ TcpQuery::~TcpQuery() {
         ::socket_close(sock_);
 }
 
-TcpErrCode TcpQuery::tcp_send(const unsigned char* _buff, unsigned int _size, int _timeout) {
+TcpErrCode TcpQuery::tcp_send(const unsigned char *_buff, unsigned int _size, int _timeout) {
     if (kTcpConnected == status_) {
         return NetCheckerSocketUtils::writenWithNonBlock(sock_, select_, _timeout, _buff, _size, errcode_);
     }
@@ -68,7 +64,7 @@ TcpErrCode TcpQuery::tcp_send(const unsigned char* _buff, unsigned int _size, in
     return kConnectErr;
 }
 
-TcpErrCode TcpQuery::tcp_receive(AutoBuffer& _recvbuf, unsigned int _size, int _timeout) {
+TcpErrCode TcpQuery::tcp_receive(AutoBuffer &_recvbuf, unsigned int _size, int _timeout) {
     if (kTcpConnected == status_) {
         TcpErrCode ret = NetCheckerSocketUtils::readnWithNonBlock(sock_, select_, _timeout, _recvbuf, _size, errcode_);
 
@@ -86,36 +82,38 @@ TcpErrCode TcpQuery::tcp_receive(AutoBuffer& _recvbuf, unsigned int _size, int _
 void TcpQuery::send_break() {
     pipe_.Break();
 }
+
 std::string TcpQuery::getStatus() {
     std::string str_status;
 
     switch (status_) {
-    case kTcpInit:
-        str_status.append("Tcp init.");
-        break;
+        case kTcpInit:
+            str_status.append("Tcp init.");
+            break;
 
-    case kTcpInitErr:
-        str_status.append("Tcp init error.");
-        break;
+        case kTcpInitErr:
+            str_status.append("Tcp init error.");
+            break;
 
-    case kTcpConnectErr:
-        str_status.append("Tcp connect error.");
-        break;
+        case kTcpConnectErr:
+            str_status.append("Tcp connect error.");
+            break;
 
-    case kTcpConnected:
-        str_status.append("Tcp connect success.");
-        break;
+        case kTcpConnected:
+            str_status.append("Tcp connect success.");
+            break;
 
-    case kTcpDisConnected:
-        str_status.append("Disconnect tcp Connection.");
-        break;
+        case kTcpDisConnected:
+            str_status.append("Disconnect tcp Connection.");
+            break;
 
-    default:
-        str_status.append("get status failed!");
+        default:
+            str_status.append("get status failed!");
     }
 
     return str_status;
 }
+
 int TcpQuery::getErrorCode() {
     return errcode_;
 }

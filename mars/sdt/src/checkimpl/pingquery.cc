@@ -40,7 +40,7 @@ using namespace mars::sdt;
 
 #define TRAFFIC_LIMIT_RET_CODE (INT_MIN)
 
-static void clearPingStatus(struct PingStatus& _ping_status) {
+static void clearPingStatus(struct PingStatus &_ping_status) {
     _ping_status.res.clear();
     _ping_status.loss_rate = 0.0;
     _ping_status.maxrtt = 0.0;
@@ -48,22 +48,24 @@ static void clearPingStatus(struct PingStatus& _ping_status) {
     _ping_status.avgrtt = 0.0;
     memset(_ping_status.ip, 0, 16);
 }
+
 #ifdef ANDROID
 
 #define MAXLINE (512) /* max text line length */
 
-void str_split(char _spliter, std::string _pingresult, std::vector<std::string>& _vec_pingres) {
+void str_split(char _spliter, std::string _pingresult, std::vector<std::string> &_vec_pingres) {
     int find_begpos = 0;
     int findpos = 0;
 
-    while ((unsigned int)findpos < _pingresult.length()) {
+    while ((unsigned int) findpos < _pingresult.length()) {
         findpos = _pingresult.find_first_of(_spliter, find_begpos);
         _vec_pingres.push_back(std::string(_pingresult, find_begpos, findpos - find_begpos));
         find_begpos = findpos + 1;
     }
 }
 
-int PingQuery::RunPingQuery(int _querycount, int interval/*S*/, int timeout/*S*/, const char* dest, unsigned int packetSize) {  // use popen
+int PingQuery::RunPingQuery(int _querycount, int interval/*S*/, int timeout/*S*/, const char *dest,
+                            unsigned int packetSize) {  // use popen
     xinfo2(TSF"in runpingquery");
     xassert2(_querycount >= 0, "ping count should be more than 0");
     xassert2(interval >= 0, "interval should be more than 0");
@@ -79,7 +81,7 @@ int PingQuery::RunPingQuery(int _querycount, int interval/*S*/, int timeout/*S*/
         timeout = DEFAULT_PING_TIMEOUT;
 
     if (NULL == dest || 0 == strlen(dest)) {
-        struct  in_addr _addr;
+        struct in_addr _addr;
         int ret = getdefaultgateway(&_addr);
 
         if (-1 == ret) {
@@ -126,9 +128,9 @@ int PingQuery::RunPingQuery(int _querycount, int interval/*S*/, int timeout/*S*/
     int tempLen = 0;
 
     if (packetSize > 0) {
-        tempLen = snprintf((char*)&cmd[index], 256 - index, " -s %u  %s", packetSize, dest);
+        tempLen = snprintf((char *) &cmd[index], 256 - index, " -s %u  %s", packetSize, dest);
     } else {
-        tempLen = snprintf((char*)&cmd[index], 256 - index, " %s", dest);
+        tempLen = snprintf((char *) &cmd[index], 256 - index, " %s", dest);
     }
 
     if (tempLen < 0 || tempLen >= 256 - index) {
@@ -137,7 +139,7 @@ int PingQuery::RunPingQuery(int _querycount, int interval/*S*/, int timeout/*S*/
     }
 
     xinfo2(TSF"popen cmd=%0", cmd);
-    FILE* pp = popen(cmd, "r");
+    FILE *pp = popen(cmd, "r");
 
     if (!pp) {
         xerror2(TSF"popen error:%0", strerror(errno));
@@ -170,11 +172,11 @@ int PingQuery::RunPingQuery(int _querycount, int interval/*S*/, int timeout/*S*/
     return 0;
 }
 
-int PingQuery::GetPingStatus(struct PingStatus& _ping_status) {
+int PingQuery::GetPingStatus(struct PingStatus &_ping_status) {
     xinfo_function();
     clearPingStatus(_ping_status);
 
-    if (pingresult_.empty())  return -1;
+    if (pingresult_.empty()) return -1;
 
     _ping_status.res = pingresult_;  //
     std::vector<std::string> vecPingRes;
@@ -207,11 +209,11 @@ int PingQuery::GetPingStatus(struct PingStatus& _ping_status) {
             int i = 3;
 
             while (iter->at(num - i) != ' ') {
-                loss_rate += ((iter->at(num - i) - '0') * (int)pow(10.0, (double)(i - 3)));
+                loss_rate += ((iter->at(num - i) - '0') * (int) pow(10.0, (double) (i - 3)));
                 i++;
             }
 
-            _ping_status.loss_rate  = (double)loss_rate / 100;
+            _ping_status.loss_rate = (double) loss_rate / 100;
         }
 
         int num2 = iter->find("rtt min/avg/max", 0);

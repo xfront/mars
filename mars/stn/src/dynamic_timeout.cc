@@ -30,157 +30,155 @@
 using namespace mars::stn;
 
 DynamicTimeout::DynamicTimeout()
-    : dyntime_status_(kEValuating)
-    , dyntime_continuous_good_count_(0)
-    , dyntime_latest_bigpkg_goodtime_(0)
-    , dyntime_fncount_latstmodify_time_(0)
-    , dyntime_fncount_pos_(-1)
+        : mDyncTimeStatus(kEValuating)
+        , mDyncTimeContinuousGoodCount(0)
+        , mDyncTimeLatestBigpkgGoodTime(0)
+        , mDyncTimeFncountLastModifyTime(0)
+        , mDyncTimeFncountPos(-1)
 {
-    dyntime_failed_normal_count_.set();
+    mDyncTimeFailNormalCount.set();
 }
 
 DynamicTimeout::~DynamicTimeout() {
 }
 
-void DynamicTimeout::CgiTaskStatistic(std::string _cgi_uri, unsigned int _total_size, uint64_t _cost_time) {
-    int task_status = (_total_size == kDynTimeTaskFailedPkgLen || _cost_time == 0) ? kDynTimeTaskFailedTag : KDynTimeTaskNormalTag;
-    
+void DynamicTimeout::CgiTaskStatistic(std::string const& cgiUri, unsigned int totalSize, uint64_t costTime) {
+    int task_status = (totalSize == kDynTimeTaskFailedPkgLen || costTime == 0) ? kDynTimeTaskFailedTag
+                                                                                   : KDynTimeTaskNormalTag;
+
     if (task_status == KDynTimeTaskNormalTag) {
-        
-        unsigned int small_pkg_costtime = kMobile != getNetInfo() ? kDynTimeSmallPackageWifiCosttime : kDynTimeSmallPackageGPRSCosttime;
-        unsigned int middle_pkg_costtime = kMobile != getNetInfo() ? kDynTimeMiddlePackageWifiCosttime : kDynTimeMiddlePackageGPRSCosttime;
-        unsigned int big_pkg_costtime = kMobile != getNetInfo() ? kDynTimeBigPackageWifiCosttime : kDynTimeBigPackageGPRSCosttime;
-        unsigned int bigger_pkg_costtime = kMobile != getNetInfo() ? kDynTimeBiggerPackageWifiCosttime : kDynTimeBiggerPackageGPRSCosttime;
-        
-        if (_total_size < kDynTimeSmallPackageLen) {
-			if (_cost_time <= small_pkg_costtime) {
-				task_status = kDynTimeTaskMeetExpectTag;
-			}
-        }
-        else if (_total_size <= kDynTimeMiddlePackageLen) {
-			if (_cost_time <= middle_pkg_costtime) {
-				task_status = kDynTimeTaskMidPkgMeetExpectTag;
-			}
-        }
-        else if (_total_size <= kDynTimeBigPackageLen ) {
-			if (_cost_time <= big_pkg_costtime) {
-				task_status = kDynTimeTaskBigPkgMeetExpectTag;
-			}
-        }
-        else if (_cost_time <= bigger_pkg_costtime) {
-			task_status = kDynTimeTaskBiggerPkgMeetExpectTag;
+
+        unsigned int small_pkg_costtime =
+                kMobile != getNetInfo() ? kDynTimeSmallPackageWifiCosttime : kDynTimeSmallPackageGPRSCosttime;
+        unsigned int middle_pkg_costtime =
+                kMobile != getNetInfo() ? kDynTimeMiddlePackageWifiCosttime : kDynTimeMiddlePackageGPRSCosttime;
+        unsigned int big_pkg_costtime =
+                kMobile != getNetInfo() ? kDynTimeBigPackageWifiCosttime : kDynTimeBigPackageGPRSCosttime;
+        unsigned int bigger_pkg_costtime =
+                kMobile != getNetInfo() ? kDynTimeBiggerPackageWifiCosttime : kDynTimeBiggerPackageGPRSCosttime;
+
+        if (totalSize < kDynTimeSmallPackageLen) {
+            if (costTime <= small_pkg_costtime) {
+                task_status = kDynTimeTaskMeetExpectTag;
+            }
+        } else if (totalSize <= kDynTimeMiddlePackageLen) {
+            if (costTime <= middle_pkg_costtime) {
+                task_status = kDynTimeTaskMidPkgMeetExpectTag;
+            }
+        } else if (totalSize <= kDynTimeBigPackageLen) {
+            if (costTime <= big_pkg_costtime) {
+                task_status = kDynTimeTaskBigPkgMeetExpectTag;
+            }
+        } else if (costTime <= bigger_pkg_costtime) {
+            task_status = kDynTimeTaskBiggerPkgMeetExpectTag;
         }
         /*else {
             task_status = DYNTIME_TASK_NORMAL_TAG;
              xdebug2(TSF"totalSize:%_, costTime:%_", totalSize, costTime);
         }*/
     }
-    
-    __StatusSwitch(_cgi_uri, task_status);
+
+    __StatusSwitch(cgiUri, task_status);
 }
 
 void DynamicTimeout::ResetStatus() {
-    
-    dyntime_status_ = kEValuating;
-    dyntime_latest_bigpkg_goodtime_ = 0;
-    dyntime_continuous_good_count_ = 0;
-    dyntime_failed_normal_count_.set();
-    dyntime_fncount_latstmodify_time_ = 0;
-    dyntime_fncount_pos_ = -1;
+
+    mDyncTimeStatus = kEValuating;
+    mDyncTimeLatestBigpkgGoodTime = 0;
+    mDyncTimeContinuousGoodCount = 0;
+    mDyncTimeFailNormalCount.set();
+    mDyncTimeFncountLastModifyTime = 0;
+    mDyncTimeFncountPos = -1;
 }
 
 int DynamicTimeout::GetStatus() {
-    return dyntime_status_;
+    return mDyncTimeStatus;
 }
 
-void DynamicTimeout::__StatusSwitch(std::string _cgi_uri, int _task_status) {
-    
-    if (dyntime_fncount_latstmodify_time_ == 0 || (gettickcount() - dyntime_fncount_latstmodify_time_) > kDynTimeCountExpireTime) {
-        dyntime_fncount_latstmodify_time_ = gettickcount();
-        dyntime_fncount_pos_ = -1;
-        if (dyntime_status_ == kBad) {
-            dyntime_failed_normal_count_.reset();
-        }
-        else {
-            dyntime_failed_normal_count_.set();
+void DynamicTimeout::__StatusSwitch(std::string const& cgiUri, int taskStatus) {
+    if (mDyncTimeFncountLastModifyTime == 0 ||
+        (gettickcount() - mDyncTimeFncountLastModifyTime) > kDynTimeCountExpireTime) {
+        mDyncTimeFncountLastModifyTime = gettickcount();
+        mDyncTimeFncountPos = -1;
+        if (mDyncTimeStatus == kBad) {
+            mDyncTimeFailNormalCount.reset();
+        } else {
+            mDyncTimeFailNormalCount.set();
         }
     }
-    
-    dyntime_fncount_pos_ = ++dyntime_fncount_pos_ >= dyntime_failed_normal_count_.size() ? 0 : dyntime_fncount_pos_;
-    
-    switch (_task_status) {
+
+    mDyncTimeFncountPos = ++mDyncTimeFncountPos >= mDyncTimeFailNormalCount.size() ? 0 : mDyncTimeFncountPos;
+
+    switch (taskStatus) {
         case kDynTimeTaskMidPkgMeetExpectTag:
         case kDynTimeTaskBigPkgMeetExpectTag:
-        case kDynTimeTaskBiggerPkgMeetExpectTag:
-        {
-            if (dyntime_status_ == kEValuating) {
-                dyntime_latest_bigpkg_goodtime_ = gettickcount();
+        case kDynTimeTaskBiggerPkgMeetExpectTag: {
+            if (mDyncTimeStatus == kEValuating) {
+                mDyncTimeLatestBigpkgGoodTime = gettickcount();
             }
         }
-        /* no break, next case*/
-        case kDynTimeTaskMeetExpectTag:
-        {
-            if (dyntime_status_ == kEValuating) {
-                dyntime_continuous_good_count_++;
+            /* no break, next case*/
+        case kDynTimeTaskMeetExpectTag: {
+            if (mDyncTimeStatus == kEValuating) {
+                mDyncTimeContinuousGoodCount++;
             }
 
-            dyntime_failed_normal_count_.set(dyntime_fncount_pos_);
+            mDyncTimeFailNormalCount.set(mDyncTimeFncountPos);
         }
             break;
-        case KDynTimeTaskNormalTag:
-        {
-            if (dyntime_status_ == kEValuating) {
-                dyntime_continuous_good_count_ = 0;
-                dyntime_latest_bigpkg_goodtime_ = 0;
+        case KDynTimeTaskNormalTag: {
+            if (mDyncTimeStatus == kEValuating) {
+                mDyncTimeContinuousGoodCount = 0;
+                mDyncTimeLatestBigpkgGoodTime = 0;
             }
 
-            dyntime_failed_normal_count_.set(dyntime_fncount_pos_);
+            mDyncTimeFailNormalCount.set(mDyncTimeFncountPos);
         }
             break;
-        case kDynTimeTaskFailedTag:
-        {
-            dyntime_continuous_good_count_ = 0;
-            dyntime_latest_bigpkg_goodtime_ = 0;
-            dyntime_failed_normal_count_.reset(dyntime_fncount_pos_);
+        case kDynTimeTaskFailedTag: {
+            mDyncTimeContinuousGoodCount = 0;
+            mDyncTimeLatestBigpkgGoodTime = 0;
+            mDyncTimeFailNormalCount.reset(mDyncTimeFncountPos);
         }
             break;
         default:
             break;
     }
-    
-    switch (dyntime_status_) {
-        case kEValuating:
-        {
-            if (dyntime_continuous_good_count_ >= kDynTimeMaxContinuousExcellentCount && (gettickcount() - dyntime_latest_bigpkg_goodtime_) <= kDynTimeCountExpireTime) {
+
+    switch (mDyncTimeStatus) {
+        case kEValuating: {
+            if (mDyncTimeContinuousGoodCount >= kDynTimeMaxContinuousExcellentCount &&
+                (gettickcount() - mDyncTimeLatestBigpkgGoodTime) <= kDynTimeCountExpireTime) {
                 xassert2(kDynTimeMaxContinuousExcellentCount >= 10, TSF"max_continuous_good_count:%_", kDynTimeMaxContinuousExcellentCount);
-                dyntime_status_ = kExcellent;
-            }
-            else if (dyntime_failed_normal_count_.count() <= kDynTimeMinNormalPkgCount){
-                xassert2(kDynTimeMinNormalPkgCount < dyntime_failed_normal_count_.size(), TSF"DYNTIME_MIN_NORMAL_PKG_COUNT:%_, dyntime_failed_normal_count_:%_", kDynTimeMinNormalPkgCount, dyntime_failed_normal_count_.size());
-                dyntime_status_ = kBad;
-                dyntime_fncount_latstmodify_time_ = 0;
-            }
-        }
-            break;
-        case kExcellent:
-        {
-            if (dyntime_continuous_good_count_ == 0 && dyntime_latest_bigpkg_goodtime_ == 0){
-                dyntime_status_ = kEValuating;
+                mDyncTimeStatus = kExcellent;
+            } else if (mDyncTimeFailNormalCount.count() <= kDynTimeMinNormalPkgCount) {
+                xassert2(kDynTimeMinNormalPkgCount < mDyncTimeFailNormalCount.size(), TSF"DYNTIME_MIN_NORMAL_PKG_COUNT:%_, mDyncTimeFailNormalCount:%_", kDynTimeMinNormalPkgCount,
+                         mDyncTimeFailNormalCount.size());
+                mDyncTimeStatus = kBad;
+                mDyncTimeFncountLastModifyTime = 0;
             }
         }
             break;
-        case kBad:
-        {
-            if (dyntime_failed_normal_count_.count() > kDynTimeMinNormalPkgCount) {
-                xassert2(kDynTimeMinNormalPkgCount < dyntime_failed_normal_count_.size(), TSF"DYNTIME_MIN_NORMAL_PKG_COUNT:%_, dyntime_failed_normal_count_:%_", kDynTimeMinNormalPkgCount, dyntime_failed_normal_count_.size());
-                dyntime_status_ = kEValuating;
-                dyntime_fncount_latstmodify_time_ = 0;
+        case kExcellent: {
+            if (mDyncTimeContinuousGoodCount == 0 && mDyncTimeLatestBigpkgGoodTime == 0) {
+                mDyncTimeStatus = kEValuating;
+            }
+        }
+            break;
+        case kBad: {
+            if (mDyncTimeFailNormalCount.count() > kDynTimeMinNormalPkgCount) {
+                xassert2(kDynTimeMinNormalPkgCount < mDyncTimeFailNormalCount.size(), TSF"DYNTIME_MIN_NORMAL_PKG_COUNT:%_, mDyncTimeFailNormalCount:%_", kDynTimeMinNormalPkgCount,
+                         mDyncTimeFailNormalCount.size());
+                mDyncTimeStatus = kEValuating;
+                mDyncTimeFncountLastModifyTime = 0;
             }
         }
             break;
         default:
             break;
     }
-    
-    xdebug2(TSF"task_status:%_, good_count:%_, good_time:%_, dyntime_status:%_, dyntime_failed_normal_count_NORMAL:%_, cgi:%_", _task_status, dyntime_continuous_good_count_, dyntime_latest_bigpkg_goodtime_, dyntime_status_, dyntime_failed_normal_count_.count(), _cgi_uri);
+
+    xdebug2(TSF"task_status:%_, good_count:%_, good_time:%_, dyntime_status:%_, dyntime_failed_normal_count_NORMAL:%_, cgi:%_",
+            taskStatus, mDyncTimeContinuousGoodCount, mDyncTimeLatestBigpkgGoodTime, mDyncTimeStatus,
+            mDyncTimeFailNormalCount.count(), cgiUri);
 }

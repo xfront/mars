@@ -98,7 +98,7 @@ void TcpServer::StopAndWait() {
 	}
     lock.unlock();
 
-    if (thread_.isruning())
+    if (thread_.isRunning())
         thread_.join();
 }
 

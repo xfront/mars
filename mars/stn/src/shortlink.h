@@ -42,49 +42,56 @@
 
 namespace mars {
 namespace stn {
-    
+
 class shortlink_tracker;
-    
+
 class ShortLink : public ShortLinkInterface {
-  public:
-    ShortLink(MessageQueue::MessageQueue_t _messagequeueid, NetSource& _netsource, const Task& _task, bool _use_proxy);
+public:
+    ShortLink(MessageQueue::MessageQueue_t msgQueueId, NetSource &netSource, const Task &task, bool useProxy);
+
     virtual ~ShortLink();
 
-    ConnectProfile   Profile() const { return conn_profile_;}
-    
-    void              FillOutterIPAddr(const std::vector<IPPortItem>& _out_addr);
+    ConnectProfile Profile() const { return mConnProfile; }
 
-  protected:
-    virtual void 	 SendRequest(AutoBuffer& _buffer_req, AutoBuffer& _task_extend);
+    void FillOutterIPAddr(const std::vector<IPPortItem> &outAddrs);
 
-    virtual void     __Run();
-    virtual SOCKET   __RunConnect(ConnectProfile& _conn_profile);
-    virtual void     __RunReadWrite(SOCKET _sock, int& _errtype, int& _errcode, ConnectProfile& _conn_profile);
-    void             __CancelAndWaitWorkerThread();
+protected:
+    virtual void SendRequest(AutoBuffer &bufferReq, AutoBuffer &taskExtend);
 
-    void			 __UpdateProfile(const ConnectProfile& _conn_profile);
+    virtual void __Run();
 
-    void 			 __RunResponseError(ErrCmdType _type, int _errcode, ConnectProfile& _conn_profile, bool _report = true);
-    void 			 __OnResponse(ErrCmdType _err_type, int _status, AutoBuffer& _body, AutoBuffer& _extension, ConnectProfile& _conn_profile, bool _report = true);
-    
-  protected:
-    MessageQueue::ScopeRegister     asyncreg_;
-    NetSource&                      net_source_;
-    Task                            task_;
-    Thread                          thread_;
+    virtual SOCKET __RunConnect(ConnectProfile &connProfile);
 
-    SocketBreaker                   breaker_;
-    ConnectProfile                  conn_profile_;
-    NetSource::DnsUtil              dns_util_;
-    const bool                      use_proxy_;
-    AutoBuffer                      send_body_;
-    AutoBuffer                      send_extend_;
-    
-    std::vector<IPPortItem>        outter_vec_addr_;
-    
-    boost::scoped_ptr<shortlink_tracker> tracker_;
+    virtual void __RunReadWrite(SOCKET sock, int &errType, int &errCode, ConnectProfile &connProfile);
+
+    void __CancelAndWaitWorkerThread();
+
+    void __UpdateProfile(const ConnectProfile &connProfile);
+
+    void __RunResponseError(ErrCmdType type, int errCode, ConnectProfile &connProfile, bool report = true);
+
+    void __OnResponse(ErrCmdType errType, int status, AutoBuffer &body, AutoBuffer &extension,
+                      ConnectProfile &connProfile, bool report = true);
+
+protected:
+    MessageQueue::ScopeRegister mAsyncReg;
+    NetSource &mNetSource;
+    Task mTask;
+    Thread mThread;
+
+    SocketBreaker mBreaker;
+    ConnectProfile mConnProfile;
+    NetSource::DnsUtil mDnsUtil;
+    const bool mUseProxy;
+    AutoBuffer mSendBody;
+    AutoBuffer mSendExtend;
+
+    std::vector<IPPortItem> mOutterAddrs;
+
+    boost::scoped_ptr<shortlink_tracker> mTracker;
 };
-        
-}}
+
+}
+}
 
 #endif // STN_SRC_MMSHORTLINK_H_

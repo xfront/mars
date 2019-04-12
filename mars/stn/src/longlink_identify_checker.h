@@ -26,24 +26,27 @@
 #include "mars/comm/autobuffer.h"
 
 class LongLinkIdentifyChecker {
-  public:
+public:
     LongLinkIdentifyChecker();
+
     ~LongLinkIdentifyChecker();
 
-    bool GetIdentifyBuffer(AutoBuffer& _buffer, uint32_t& _cmd_id);
-    void SetID(uint32_t _taskid);
+    bool GetIdentifyBuffer(AutoBuffer &buffer, uint32_t &_cmd_id);
 
-    bool IsIdentifyResp(uint32_t _cmdid, uint32_t _taskid, const AutoBuffer& _buffer, const AutoBuffer& _extend) const;
-    bool OnIdentifyResp(AutoBuffer& _buffer);
+    void SetID(uint32_t taskId);
+
+    bool IsIdentifyResp(uint32_t cmdId, uint32_t taskId, const AutoBuffer &buffer, const AutoBuffer &bufExt) const;
+
+    bool OnIdentifyResp(AutoBuffer &buffer);
 
     void Reset();
 
 
-  private:
-    bool has_checked_;
-    uint32_t cmd_id_;
-    uint32_t taskid_;
-    AutoBuffer hash_code_buffer_;
+private:
+    bool mHasChecked;
+    uint32_t mCmdId;
+    uint32_t mTaskId;
+    AutoBuffer mHashCodeBuffer;
 };
 
 

@@ -31,11 +31,11 @@
 
 extern std::string getAppPrivatePath();
 
-static bool startNewdnsMockServer(const char* _ip, uint16_t _port)
+static bool startNewdnsMockServer(const char* ip, uint16_t port)
 {
 	_chdir(NETSOURCE_CHDIR_DIR);
 	char tmpCmd[1024] = {0};
-	snprintf(tmpCmd, sizeof(tmpCmd), START_NEWDNS_SERVER_CMD, _ip, _port);
+	snprintf(tmpCmd, sizeof(tmpCmd), START_NEWDNS_SERVER_CMD, ip, port);
 	printf("line:%d,tempCmd=%s\n",__LINE__, tmpCmd);
 	FILE* f = _popen(tmpCmd , "rt");
 	if(NULL == f)   

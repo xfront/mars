@@ -4,7 +4,7 @@
  */
 
 void ImportLibs() {
-	
-	extern void ExportXlog();
-	ExportXlog();
+
+    extern void ExportXlog();
+    ExportXlog();
 }

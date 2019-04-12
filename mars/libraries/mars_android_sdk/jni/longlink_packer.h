@@ -39,42 +39,50 @@
 class AutoBuffer;
 
 namespace mars {
-    namespace stn {
-    
+namespace stn {
+
 class longlink_tracker {
 public:
-    static longlink_tracker* (*Create)();
-    
+    static longlink_tracker *(*Create)();
+
 public:
-    virtual ~longlink_tracker(){};
+    virtual ~longlink_tracker() {};
 };
 
 /**
  * package the request data
- * _cmdid: business identifier
- * _seq: task id
+ * cmdId: business identifier
+ * seq: task id
  * _raw: business send buffer
- * _packed: business send buffer + request header
+ * bufOut: business send buffer + request header
  */
-extern void (*longlink_pack)(uint32_t _cmdid, uint32_t _seq, const AutoBuffer& _body, const AutoBuffer& _extension, AutoBuffer& _packed, longlink_tracker* _tracker);
+extern void (*longlink_pack)(uint32_t cmdId, uint32_t seq, const AutoBuffer &body, const AutoBuffer &bufExt,
+                             AutoBuffer &bufOut, longlink_tracker *tracker);
 
 /**
  * unpackage the response data
- * _packed: data received from server
- * _cmdid: business identifier
- * _seq: task id
- * _package_len:
- * _body: business receive buffer
+ * bufOut: data received from server
+ * cmdId: business identifier
+ * seq: task id
+ * packageLen:
+ * body: business receive buffer
  * return: 0 if unpackage succ
  */
-extern int  (*longlink_unpack)(const AutoBuffer& _packed, uint32_t& _cmdid, uint32_t& _seq, size_t& _package_len, AutoBuffer& _body, AutoBuffer& _extension, longlink_tracker* _tracker);
+extern int
+(*longlink_unpack)(const AutoBuffer &bufOut, uint32_t &cmdId, uint32_t &seq, size_t &packageLen, AutoBuffer &body,
+                   AutoBuffer &bufExt, longlink_tracker *tracker);
 
 //heartbeat signal to keep longlink network alive
 extern uint32_t (*longlink_noop_cmdid)();
-extern bool  (*longlink_noop_isresp)(uint32_t _taskid, uint32_t _cmdid, uint32_t _recv_seq, const AutoBuffer& _body, const AutoBuffer& _extend);
+
+extern bool (*longlink_noop_isresp)(uint32_t taskId, uint32_t cmdId, uint32_t recvSeq, const AutoBuffer &body,
+                                    const AutoBuffer &bufExt);
+
 extern uint32_t (*signal_keep_cmdid)();
-extern void (*longlink_noop_req_body)(AutoBuffer& _body, AutoBuffer& _extend);
-extern void (*longlink_noop_resp_body)(const AutoBuffer& _body, const AutoBuffer& _extend);
+
+extern void (*longlink_noop_req_body)(AutoBuffer &body, AutoBuffer &bufExt);
+
+extern void (*longlink_noop_resp_body)(const AutoBuffer &body, const AutoBuffer &bufExt);
 
 extern uint32_t (*longlink_noop_interval)();
 
@@ -83,8 +91,11 @@ extern bool (*longlink_complexconnect_need_verify)();
 /**
  * return: whether the received data is pushing from server or not
  */
-extern bool  (*longlink_ispush)(uint32_t _cmdid, uint32_t _taskid, const AutoBuffer& _body, const AutoBuffer& _extend);
-extern bool  (*longlink_identify_isresp)(uint32_t _sent_seq, uint32_t _cmdid, uint32_t _recv_seq, const AutoBuffer& _body, const AutoBuffer& _extend);
+extern bool (*longlink_ispush)(uint32_t cmdId, uint32_t taskId, const AutoBuffer &body, const AutoBuffer &bufExt);
+
+extern bool
+(*longlink_identify_isresp)(uint32_t sentSeq, uint32_t cmdId, uint32_t recvSeq, const AutoBuffer &body,
+                            const AutoBuffer &bufExt);
 
 }
 }

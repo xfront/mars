@@ -1,20 +1,19 @@
 /*
-* Tencent is pleased to support the open source community by making Mars available.
-* Copyright (C) 2016 THL A29 Limited, a Tencent company. All rights reserved.
-*
-* Licensed under the MIT License (the "License"); you may not use this file except in 
-* compliance with the License. You may obtain a copy of the License at
-* http://opensource.org/licenses/MIT
-*
-* Unless required by applicable law or agreed to in writing, software distributed under the License is
-* distributed on an "AS IS" basis, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-* either express or implied. See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Tencent is pleased to support the open source community by making Mars available.
+ * Copyright (C) 2016 THL A29 Limited, a Tencent company. All rights reserved.
+ *
+ * Licensed under the MIT License (the "License"); you may not use this file except in
+ * compliance with the License. You may obtain a copy of the License at
+ * http://opensource.org/licenses/MIT
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is
+ * distributed on an "AS IS" basis, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+ * either express or implied. See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package com.tencent.mars.sample.chat;
 
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
 import android.support.v7.app.AlertDialog;
@@ -30,16 +29,20 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.tencent.mars.sample.R;
 import com.tencent.mars.sample.SampleApplicaton;
 import com.tencent.mars.sample.core.ActivityEvent;
 import com.tencent.mars.sample.core.ActivityEventConnection;
+import com.tencent.mars.sample.service.IMService;
 import com.tencent.mars.sample.wrapper.remote.MarsServiceProxy;
 
 import java.util.Observable;
 import java.util.Observer;
 
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.schedulers.Schedulers;
 import utils.bindsimple.BindSimple;
 import utils.bindsimple.BindView;
 
@@ -67,6 +70,7 @@ public class ChatActivity extends AppCompatActivity implements Observer {
 
     private ChatMsgViewAdapter adapter;// 消息视图的Adapter
 
+    @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_chat);
@@ -91,12 +95,7 @@ public class ChatActivity extends AppCompatActivity implements Observer {
 
         ChatDataCore.getInstance().addObserver(this);
 
-        btnSend.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                onClickBtnSend();
-            }
-        });
+        btnSend.setOnClickListener(v -> onClickBtnSend());
 
         btnSend.setClickable(false);
         editTextContent.addTextChangedListener(new TextWatcher() {
@@ -128,25 +127,19 @@ public class ChatActivity extends AppCompatActivity implements Observer {
                     .setIcon(android.R.drawable.ic_dialog_info)
                     .setView(editText)
                     .setPositiveButton("确定", null).create();
-            d.setOnShowListener(new DialogInterface.OnShowListener() {
-                @Override
-                public void onShow(DialogInterface dialog) {
-                    Button b = d.getButton(AlertDialog.BUTTON_POSITIVE);
-                    b.setOnClickListener(new OnClickListener() {
-                        @Override
-                        public void onClick(View view) {
-                            String nick = editText.getText().toString();
-                            if (nick.length() > 0 && !nick.trim().equals("")) {
-                                SampleApplicaton.accountInfo.userName = nick.trim();
-                                SampleApplicaton.hasSetUserName = true;
-                            } else {
-                                return;
-                            }
+            d.setOnShowListener(dialog -> {
+                Button b = d.getButton(AlertDialog.BUTTON_POSITIVE);
+                b.setOnClickListener(view -> {
+                    String nick = editText.getText().toString();
+                    if (nick.length() > 0 && !nick.trim().equals("")) {
+                        SampleApplicaton.accountInfo.userName = nick.trim();
+                        SampleApplicaton.hasSetUserName = true;
+                    } else {
+                        return;
+                    }
 
-                            d.dismiss();
-                        }
-                    });
-                }
+                    d.dismiss();
+                });
             });
             d.show();
         }
@@ -155,12 +148,13 @@ public class ChatActivity extends AppCompatActivity implements Observer {
     @Override
     public void onResume() {
         super.onResume();
-        MarsServiceProxy.inst.setForeground(true);
+        MarsServiceProxy.instance().setForeground(true);
     }
 
+    @Override
     public void onPause() {
         super.onPause();
-        MarsServiceProxy.inst.setForeground(false);
+        MarsServiceProxy.instance().setForeground(false);
     }
 
     @Override
@@ -199,21 +193,14 @@ public class ChatActivity extends AppCompatActivity implements Observer {
 
         editTextContent.setText("");
 
-        MarsServiceProxy.send(new TextMessageTask(topicName, message)
-                .onOK(new Runnable() {
-
-                    @Override
-                    public void run() {
-
-                    }
-
-                }).onError(new Runnable() {
-
-                    @Override
-                    public void run() {
-                    }
-
-                }));
+        IMService.sendTextMessage(topicName, message)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(r -> {
+                    Toast.makeText(this, "Rsp:" + r.getText(), Toast.LENGTH_SHORT).show();
+                }, t -> {
+                    Toast.makeText(this, t.getMessage(), Toast.LENGTH_LONG).show();
+                });
     }
 
 }

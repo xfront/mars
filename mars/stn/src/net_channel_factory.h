@@ -30,29 +30,32 @@ namespace mars {
 namespace stn {
 
 struct Task;
+
 class LongLink;
+
 class NetSource;
+
 class ShortLinkInterface;
 
 namespace ShortLinkChannelFactory {
 
-extern ShortLinkInterface* (*Create)(const mq::MessageQueue_t& _messagequeueid, NetSource& _netsource, const Task& _task, bool _use_proxy);
+extern ShortLinkInterface *
+(*Create)(const mq::MessageQueue_t &msgQueueId, NetSource &netSource, const Task &task, bool useProxy);
 
-extern void (*Destory)(ShortLinkInterface* _short_link_channel);
+extern void (*Destory)(ShortLinkInterface *_short_link_channel);
 
 }
 
 namespace LongLinkChannelFactory {
 
-extern LongLink* (*Create)(const mq::MessageQueue_t& _messagequeueid, NetSource& _netsource);
+extern LongLink *(*Create)(const mq::MessageQueue_t &msgQueueId, NetSource &netSource);
 
-extern void (*Destory)(LongLink* _long_link_channel);
-
-}
+extern void (*Destory)(LongLink *_long_link_channel);
 
 }
-}
 
+}
+}
 
 
 #endif /* SRC_NET_CHANNEL_FACTORY_H_ */

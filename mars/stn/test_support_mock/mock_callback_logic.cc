@@ -23,7 +23,7 @@ void reportFlowData(const int wifiRecvDataSize, const int wifiSendDataSize, int 
 void reportNetConnectInfo(int netstatus, bool blonglinkbeconnected) {}
 void longLinkConnectInfo(int netstatus) {}
 void shortLinkConnectState(bool _isConnectSuc) {}
-void reportCrashStatistics(const char* _raw, const char* _type) {}
+void reportCrashStatistics(const char* _raw, const char* type) {}
 
 std::string getUserIDCLocale()
 {

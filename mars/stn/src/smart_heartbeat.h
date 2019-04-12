@@ -30,13 +30,13 @@
 #include "special_ini.h"
 
 enum HeartbeatReportType {
-    kReportTypeCompute            = 1,        // report info of compute smart heartbeat
-    kReportTypeSuccRate           = 2,    // report succuss rate when smart heartbeat is stabled
+    kReportTypeCompute = 1,        // report info of compute smart heartbeat
+    kReportTypeSuccRate = 2,    // report succuss rate when smart heartbeat is stabled
 };
 enum TSmartHeartBeatType {
-	kNoSmartHeartBeat = 0,
-	kSmartHeartBeat,
-	kDozeModeHeart,
+    kNoSmartHeartBeat = 0,
+    kSmartHeartBeat,
+    kDozeModeHeart,
 };
 
 enum TSmartHeartBeatAction {
@@ -49,68 +49,77 @@ enum TSmartHeartBeatAction {
 class SmartHeartbeat;
 
 class NetHeartbeatInfo {
-  public:
+public:
     NetHeartbeatInfo();
+
     void Clear();
 
-  public:
+public:
 //    NetHeartbeatInfo(const NetHeartbeatInfo&);
 //    NetHeartbeatInfo& operator=(const NetHeartbeatInfo&);
-    
-  public:
-    std::string net_detail_;
-    int net_type_;
 
-    unsigned int cur_heart_;
-    TSmartHeartBeatType heart_type_;
-    bool is_stable_;
-    time_t last_modify_time_;
+public:
+    std::string mNetDetail;
+    int mNetType;
 
-    unsigned int fail_heart_count_;  // accumulated failed counts on curHeart
-    unsigned int succ_heart_count_;
-    unsigned int min_heart_fail_count_;
+    unsigned int mCurHeart;
+    TSmartHeartBeatType mHeartType;
+    bool mIsStable;
+    time_t mLastModifyTime;
+
+    unsigned int mHeartFailCount;  // accumulated failed counts on curHeart
+    unsigned int mHeartSuccCount;
+    unsigned int mHeartFailMinCount;
 
     friend class SmartHeartbeat;
 };
 
 class SmartHeartbeat {
-  public:
-    boost::function<void (TSmartHeartBeatAction _action, const NetHeartbeatInfo& _heart_info, bool _fail_timeout)> report_smart_heart_;
-    
-	SmartHeartbeat();
-	~SmartHeartbeat();
+public:
+    boost::function<void(TSmartHeartBeatAction action, const NetHeartbeatInfo &heartInfo,
+                         bool failTimout)> ReportSmartHeartHook;
+
+    SmartHeartbeat();
+
+    ~SmartHeartbeat();
+
     void OnHeartbeatStart();
 
     void OnLongLinkEstablished();
+
     void OnLongLinkDisconnect();
-    void OnHeartResult(bool _sucess, bool _fail_of_timeout);
+
+    void OnHeartResult(bool success, bool failTimeout);
+
     unsigned int GetNextHeartbeatInterval();   // bIsUseSmartBeat is add by andrewu for stat
 
     // MIUI align alarm response at Times of five minutes, We should  handle this case specailly.
     void JudgeDozeStyle();
 
-  private:
+private:
     void __DumpHeartInfo();
 
     bool __IsDozeStyle();
 
     void __LimitINISize();
+
     void __LoadINI();
+
     void __SaveINI();
 
-  private:
-    bool is_wait_heart_response_;
-    
-    unsigned int success_heart_count_;  // the total success heartbeat based on single alive TCP, And heartbeat interval can be different.
-    unsigned int last_heart_;
-    NetHeartbeatInfo current_net_heart_info_;
+private:
+    bool mIsWaitHeartRsp;
 
-    SpecialINI ini_;
-    
-    int doze_mode_count_;
-    int normal_mode_count_;
-    tickcount_t noop_start_tick_;
-    
+    unsigned int mHeartSuccCount;  // the total success heartbeat based on single alive TCP, And heartbeat interval can be different.
+    unsigned int mLastHeart;
+    NetHeartbeatInfo mCurrentHeartInfo;
+
+    SpecialINI mIni;
+
+    int mDozeModeCount;
+    int mNormalModeCount;
+    tickcount_t mNoopStartTick;
+
 };
 
 #endif // STN_SRC_SMART_HEARTBEAT_H_

@@ -28,33 +28,41 @@
 
 namespace mars {
 namespace stn {
-    
+
 class WeakNetworkLogic {
 public:
     SINGLETON_INTRUSIVE(WeakNetworkLogic, new WeakNetworkLogic, delete);
-    boost::function<void (int _key, int _value, bool _is_important)> report_weak_logic_;
-    
+
+    boost::function<void(int key, int value, bool isImportant)> reportWeakHook;
+
     bool IsCurrentNetworkWeak();
-    void OnConnectEvent(bool _is_suc, int _rtt, int _index);
-    void OnPkgEvent(bool _is_firstpkg, int _span);
-    void OnTaskEvent(const TaskProfile& _task_profile);
-    bool IsLastValidConnectFail(int64_t &_span);
-    
+
+    void OnConnectEvent(bool isSucc, int rtt, int index);
+
+    void OnPkgEvent(bool isFirstPkg, int span);
+
+    void OnTaskEvent(const TaskProfile &taskProfile);
+
+    bool IsLastValidConnectFail(int64_t &span);
+
 private:
     WeakNetworkLogic();
+
     virtual ~WeakNetworkLogic();
-    void __SignalForeground(bool _is_foreground);
-    void __ReportWeakLogic(int _key, int _value, bool _is_important);
-    
+
+    void __SignalForeground(bool isForeground);
+
+    void __ReportWeakLogic(int key, int value, bool isImportant);
+
 private:
-    tickcount_t first_mark_tick_;
-    tickcount_t last_mark_tick_;
-    bool is_curr_weak_;
-    unsigned int connect_after_weak_;
-    tickcount_t last_connect_fail_tick_;
-    tickcount_t last_connect_suc_tick_;
+    tickcount_t mFirstMarkTick;
+    tickcount_t mLastMarkTick;
+    bool mIsCurrWeak;
+    unsigned int mConnAfterWeak;
+    tickcount_t mLastConnFailTick;
+    tickcount_t mLastConnSuccTick;
 };
-    
+
 }
 }
 

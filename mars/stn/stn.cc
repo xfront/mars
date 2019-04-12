@@ -29,26 +29,26 @@ namespace mars{
 static uint32_t gs_taskid = 1;
 Task::Task():Task(atomic_inc32(&gs_taskid)) {}
         
-Task::Task(uint32_t _taskid) {
+Task::Task(uint32_t taskId0) {
     
-    taskid = _taskid;
-    cmdid = 0;
-    channel_id = 0;
-    channel_select = 0;
+    taskId = taskId0;
+    cmdId = 0;
+    channelId = 0;
+    channelSelect = 0;
     
-    send_only = false;
-    need_authed = false;
-    limit_flow = true;
-    limit_frequency = true;
+    sendOnly = false;
+    needAuthed = false;
+    limitFlow = true;
+    limitFrequency = true;
     
-    channel_strategy = kChannelNormalStrategy;
-    network_status_sensitive = false;
+    channelStrategy = kChannelNormalStrategy;
+    networkStatusSensitive = false;
     priority = kTaskPriorityNormal;
     
-    retry_count = -1;
-    server_process_cost = -1;
-    total_timetout = -1;
-    user_context = NULL;
+    retryCount = -1;
+    serverProcessCost = -1;
+    totalTimetout = -1;
+    userContext = NULL;
 
 }
         

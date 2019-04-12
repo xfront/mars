@@ -45,19 +45,24 @@
 static const std::string kFileName = "Heartbeat.ini";
 
 // INI key
-static const char* const kKeyModifyTime      = "modifyTime";
-static const char* const kKeyCurHeart        = "curHeart";
-static const char* const kKeyFailHeartCount  = "failHeartCount";
-static const char* const kKeyStable          = "stable";
-static const char* const kKeyNetType         = "netType";
-static const char* const kKeyHeartType       = "hearttype";
-static const char* const kKeyMinHeartFail    = "minheartfail";
+static const char *const kKeyModifyTime = "modifyTime";
+static const char *const kKeyCurHeart = "curHeart";
+static const char *const kKeyFailHeartCount = "failHeartCount";
+static const char *const kKeyStable = "stable";
+static const char *const kKeyNetType = "netType";
+static const char *const kKeyHeartType = "hearttype";
+static const char *const kKeyMinHeartFail = "minheartfail";
 
-SmartHeartbeat::SmartHeartbeat(): report_smart_heart_(NULL), is_wait_heart_response_(false), success_heart_count_(0), last_heart_(MinHeartInterval),
-    ini_(mars::app::GetAppFilePath() + "/" + kFileName, false)
-    , doze_mode_count_(0), normal_mode_count_(0), noop_start_tick_(false) {
+SmartHeartbeat::SmartHeartbeat()
+    : ReportSmartHeartHook(NULL)
+    , mIsWaitHeartRsp(false)
+    , mHeartSuccCount(0)
+    , mLastHeart(MinHeartInterval)
+    , mIni(mars::app::GetAppFilePath() + "/" + kFileName, false), mDozeModeCount(0)
+    , mNormalModeCount(0), mNoopStartTick(false)
+{
     xinfo_function();
-    ini_.Parse();
+    mIni.Parse();
 }
 
 SmartHeartbeat::~SmartHeartbeat() {
@@ -68,14 +73,14 @@ SmartHeartbeat::~SmartHeartbeat() {
 void SmartHeartbeat::OnHeartbeatStart() {
     xverbose_function();
 
-    noop_start_tick_.gettickcount();
-    is_wait_heart_response_ = true;
+    mNoopStartTick.gettickcount();
+    mIsWaitHeartRsp = true;
 }
 
 void SmartHeartbeat::OnLongLinkEstablished() {
     xdebug_function();
     __LoadINI();
-    success_heart_count_ = 0;
+    mHeartSuccCount = 0;
 }
 
 void SmartHeartbeat::OnLongLinkDisconnect() {
@@ -83,131 +88,137 @@ void SmartHeartbeat::OnLongLinkDisconnect() {
 
     OnHeartResult(false, false);
 
-    if (!current_net_heart_info_.is_stable_) {
-		xinfo2(TSF"%0 not stable last heart:%1", current_net_heart_info_.net_detail_, current_net_heart_info_.cur_heart_);
-		return;
-	}
+    if (!mCurrentHeartInfo.mIsStable) {
+        xinfo2(TSF"%0 not stable last heart:%1", mCurrentHeartInfo.mNetDetail,
+               mCurrentHeartInfo.mCurHeart);
+        return;
+    }
 
-    current_net_heart_info_.succ_heart_count_ = 0;
-    last_heart_ = MinHeartInterval;
+    mCurrentHeartInfo.mHeartSuccCount = 0;
+    mLastHeart = MinHeartInterval;
 }
 
 #define ONE_DAY_SECONEDS (24 * 60 * 60)
 
-void SmartHeartbeat::OnHeartResult(bool _sucess, bool _fail_of_timeout) {
-    if(!is_wait_heart_response_)
+void SmartHeartbeat::OnHeartResult(bool success, bool failTimeout) {
+    if (!mIsWaitHeartRsp)
         return;
-    
-    if(report_smart_heart_&& !_sucess && success_heart_count_ >=NetStableTestCount && current_net_heart_info_.is_stable_) {
-        report_smart_heart_(kActionDisconnect, current_net_heart_info_, _fail_of_timeout);
-    }
-    
-    xdebug2(TSF"heart result:%0, timeout:%1", _sucess, _fail_of_timeout);
-    is_wait_heart_response_ = false;
 
-    xassert2(!current_net_heart_info_.net_detail_.empty(), "something wrong,net_detail_ shoudn't be NULL");
-    if (current_net_heart_info_.net_detail_.empty()) return;
-    if(_sucess) success_heart_count_ += 1;
-    if (success_heart_count_ < NetStableTestCount) {
-        current_net_heart_info_.min_heart_fail_count_ = _sucess ? 0 : (current_net_heart_info_.min_heart_fail_count_ + 1);
-        if(report_smart_heart_ && current_net_heart_info_.min_heart_fail_count_ >= 6 && ::isNetworkConnected()) {
-            report_smart_heart_(kActionBadNetwork, current_net_heart_info_, false);
-            current_net_heart_info_.min_heart_fail_count_ = 0;
+    if (ReportSmartHeartHook && !success && mHeartSuccCount >= NetStableTestCount &&
+        mCurrentHeartInfo.mIsStable) {
+        ReportSmartHeartHook(kActionDisconnect, mCurrentHeartInfo, failTimeout);
+    }
+
+    xdebug2(TSF"heart result:%0, timeout:%1", success, failTimeout);
+    mIsWaitHeartRsp = false;
+
+    xassert2(!mCurrentHeartInfo.mNetDetail.empty(), "something wrong,mNetDetail shoudn't be NULL");
+    if (mCurrentHeartInfo.mNetDetail.empty()) return;
+    if (success) mHeartSuccCount += 1;
+    if (mHeartSuccCount < NetStableTestCount) {
+        mCurrentHeartInfo.mHeartFailMinCount = success ? 0 : (mCurrentHeartInfo.mHeartFailMinCount +
+                                                                       1);
+        if (ReportSmartHeartHook && mCurrentHeartInfo.mHeartFailMinCount >= 6 && ::isNetworkConnected()) {
+            ReportSmartHeartHook(kActionBadNetwork, mCurrentHeartInfo, false);
+            mCurrentHeartInfo.mHeartFailMinCount = 0;
         }
         return;
     }
 
-    if (last_heart_ != current_net_heart_info_.cur_heart_) {
+    if (mLastHeart != mCurrentHeartInfo.mCurHeart) {
         xdebug2(TSF"last heart & cur_heart not match, ignore");
         return;
     }
-    
-    if(_sucess) {
-        current_net_heart_info_.succ_heart_count_ += 1;
-        current_net_heart_info_.fail_heart_count_ = 0;
+
+    if (success) {
+        mCurrentHeartInfo.mHeartSuccCount += 1;
+        mCurrentHeartInfo.mHeartFailCount = 0;
+    } else {
+        mCurrentHeartInfo.mHeartFailCount += 1;
     }
-    else {
-        current_net_heart_info_.fail_heart_count_ += 1;
-    }
-    
-    if (_sucess && current_net_heart_info_.is_stable_) {
+
+    if (success && mCurrentHeartInfo.mIsStable) {
         // has reach the Max value, no need to try bigger.
-        if (current_net_heart_info_.cur_heart_ >= MaxHeartInterval - SuccessStep)   return;
-        
+        if (mCurrentHeartInfo.mCurHeart >= MaxHeartInterval - SuccessStep) return;
+
         time_t cur_time = time(NULL);
         // heart info changed recently,Don't need probe
         // probe bigger heart on Wednesday
-        if ((cur_time - current_net_heart_info_.last_modify_time_) >= 7*ONE_DAY_SECONEDS && current_net_heart_info_.cur_heart_ < (MaxHeartInterval - SuccessStep)) {
-            xinfo2(TSF"tryProbeBiggerHeart. curHeart=%_, last modify:%_", current_net_heart_info_.cur_heart_, current_net_heart_info_.last_modify_time_);
-            current_net_heart_info_.cur_heart_ += SuccessStep;
-            current_net_heart_info_.succ_heart_count_ = 0;
-            current_net_heart_info_.is_stable_ = false;
-            current_net_heart_info_.fail_heart_count_ = 0;
-            if(report_smart_heart_)
-                report_smart_heart_(kActionReCalc, current_net_heart_info_, false);
+        if ((cur_time - mCurrentHeartInfo.mLastModifyTime) >= 7 * ONE_DAY_SECONEDS &&
+            mCurrentHeartInfo.mCurHeart < (MaxHeartInterval - SuccessStep)) {
+            xinfo2(TSF"tryProbeBiggerHeart. curHeart=%_, last modify:%_", mCurrentHeartInfo.mCurHeart,
+                   mCurrentHeartInfo.mLastModifyTime);
+            mCurrentHeartInfo.mCurHeart += SuccessStep;
+            mCurrentHeartInfo.mHeartSuccCount = 0;
+            mCurrentHeartInfo.mIsStable = false;
+            mCurrentHeartInfo.mHeartFailCount = 0;
+            if (ReportSmartHeartHook)
+                ReportSmartHeartHook(kActionReCalc, mCurrentHeartInfo, false);
             __SaveINI();
         }
         return;
     }
-    
-    if (_sucess) {
-        if(current_net_heart_info_.succ_heart_count_ >= BaseSuccCount) {
-            if (current_net_heart_info_.cur_heart_ >= (MaxHeartInterval - SuccessStep)) {
+
+    if (success) {
+        if (mCurrentHeartInfo.mHeartSuccCount >= BaseSuccCount) {
+            if (mCurrentHeartInfo.mCurHeart >= (MaxHeartInterval - SuccessStep)) {
                 //already max, make stable
-                current_net_heart_info_.cur_heart_ = MaxHeartInterval - SuccessStep;
-                current_net_heart_info_.succ_heart_count_ = 0;
-                current_net_heart_info_.is_stable_ = true;
-                current_net_heart_info_.heart_type_ = __IsDozeStyle() ? kDozeModeHeart : kSmartHeartBeat;
-                xinfo2(TSF"%0 find the smart heart interval = %1", current_net_heart_info_.net_detail_, current_net_heart_info_.cur_heart_);
-                if(report_smart_heart_)
-                    report_smart_heart_(kActionCalcEnd, current_net_heart_info_, false);
+                mCurrentHeartInfo.mCurHeart = MaxHeartInterval - SuccessStep;
+                mCurrentHeartInfo.mHeartSuccCount = 0;
+                mCurrentHeartInfo.mIsStable = true;
+                mCurrentHeartInfo.mHeartType = __IsDozeStyle() ? kDozeModeHeart : kSmartHeartBeat;
+                xinfo2(TSF"%0 find the smart heart interval = %1", mCurrentHeartInfo.mNetDetail,
+                       mCurrentHeartInfo.mCurHeart);
+                if (ReportSmartHeartHook)
+                    ReportSmartHeartHook(kActionCalcEnd, mCurrentHeartInfo, false);
             } else {
-                current_net_heart_info_.succ_heart_count_ = 0;
-                
-                unsigned int old_heart = current_net_heart_info_.cur_heart_;
-                if(__IsDozeStyle()) {
-                    current_net_heart_info_.cur_heart_ = MaxHeartInterval - SuccessStep;
+                mCurrentHeartInfo.mHeartSuccCount = 0;
+
+                unsigned int old_heart = mCurrentHeartInfo.mCurHeart;
+                if (__IsDozeStyle()) {
+                    mCurrentHeartInfo.mCurHeart = MaxHeartInterval - SuccessStep;
                 } else {
-                    current_net_heart_info_.cur_heart_ += HeartStep;
-                    current_net_heart_info_.cur_heart_ = std::min((unsigned int)(MaxHeartInterval - SuccessStep), current_net_heart_info_.cur_heart_);
+                    mCurrentHeartInfo.mCurHeart += HeartStep;
+                    mCurrentHeartInfo.mCurHeart = std::min((unsigned int) (MaxHeartInterval - SuccessStep),
+                                                                  mCurrentHeartInfo.mCurHeart);
                 }
-                
-                xinfo2(TSF"increace curHeart from %_ to %_", old_heart, current_net_heart_info_.cur_heart_);
+
+                xinfo2(TSF"increace curHeart from %_ to %_", old_heart, mCurrentHeartInfo.mCurHeart);
             }
         }
     } else {
-        if (last_heart_ == MinHeartInterval) return;
-        
-        if (current_net_heart_info_.fail_heart_count_ >= MaxHeartFailCount) {
-            if (current_net_heart_info_.is_stable_) {
-                current_net_heart_info_.cur_heart_ = MinHeartInterval;
-                current_net_heart_info_.succ_heart_count_ = 0;
-                current_net_heart_info_.is_stable_ = false;
-                if(report_smart_heart_)
-                    report_smart_heart_(kActionReCalc, current_net_heart_info_, true);
+        if (mLastHeart == MinHeartInterval) return;
+
+        if (mCurrentHeartInfo.mHeartFailCount >= MaxHeartFailCount) {
+            if (mCurrentHeartInfo.mIsStable) {
+                mCurrentHeartInfo.mCurHeart = MinHeartInterval;
+                mCurrentHeartInfo.mHeartSuccCount = 0;
+                mCurrentHeartInfo.mIsStable = false;
+                if (ReportSmartHeartHook)
+                    ReportSmartHeartHook(kActionReCalc, mCurrentHeartInfo, true);
                 //first report, then set fail count
-                current_net_heart_info_.fail_heart_count_  = 0;
+                mCurrentHeartInfo.mHeartFailCount = 0;
                 xinfo2(TSF"in stable sate,can't use old value to Keep TCP alive");
             } else {
-                if(__IsDozeStyle()) {
-                    current_net_heart_info_.cur_heart_ = MinHeartInterval;
-                } else if ((current_net_heart_info_.cur_heart_ - HeartStep - SuccessStep) > MinHeartInterval) {
-                    current_net_heart_info_.cur_heart_ = current_net_heart_info_.cur_heart_ - HeartStep - SuccessStep;
+                if (__IsDozeStyle()) {
+                    mCurrentHeartInfo.mCurHeart = MinHeartInterval;
+                } else if ((mCurrentHeartInfo.mCurHeart - HeartStep - SuccessStep) > MinHeartInterval) {
+                    mCurrentHeartInfo.mCurHeart = mCurrentHeartInfo.mCurHeart - HeartStep - SuccessStep;
                 } else {
-                    current_net_heart_info_.cur_heart_ = MinHeartInterval;
+                    mCurrentHeartInfo.mCurHeart = MinHeartInterval;
                 }
-                
-                current_net_heart_info_.succ_heart_count_ = 0;
-                current_net_heart_info_.fail_heart_count_ = 0;
-                current_net_heart_info_.is_stable_ = true;
-                current_net_heart_info_.heart_type_ = __IsDozeStyle() ? kDozeModeHeart : kSmartHeartBeat;
-                xinfo2(TSF"finish choose the proper value %0", current_net_heart_info_.cur_heart_);
-                if(report_smart_heart_)
-                    report_smart_heart_(kActionCalcEnd, current_net_heart_info_, false);
+
+                mCurrentHeartInfo.mHeartSuccCount = 0;
+                mCurrentHeartInfo.mHeartFailCount = 0;
+                mCurrentHeartInfo.mIsStable = true;
+                mCurrentHeartInfo.mHeartType = __IsDozeStyle() ? kDozeModeHeart : kSmartHeartBeat;
+                xinfo2(TSF"finish choose the proper value %0", mCurrentHeartInfo.mCurHeart);
+                if (ReportSmartHeartHook)
+                    ReportSmartHeartHook(kActionCalcEnd, mCurrentHeartInfo, false);
             }
         }
     }
-    
+
     __DumpHeartInfo();
     __SaveINI();
 }
@@ -216,98 +227,104 @@ void SmartHeartbeat::OnHeartResult(bool _sucess, bool _fail_of_timeout) {
 #define MAX_JUDGE_TIMES (10)
 
 void SmartHeartbeat::JudgeDozeStyle() {
-    
-    if(ActiveLogic::Singleton::Instance()->IsActive())  return;
-    if(!noop_start_tick_.isValid()) return;
-    if(kMobile != ::getNetInfo())   return;
-    
-    if(std::abs(noop_start_tick_.gettickspan() - last_heart_) >= 20*1000) {
-        doze_mode_count_++;
-        normal_mode_count_ = std::max(normal_mode_count_-1, 0);
+
+    if (ActiveLogic::Singleton::Instance()->IsActive()) return;
+    if (!mNoopStartTick.isValid()) return;
+    if (kMobile != ::getNetInfo()) return;
+
+    if (std::abs(mNoopStartTick.gettickspan() - mLastHeart) >= 20 * 1000) {
+        mDozeModeCount++;
+        mNormalModeCount = std::max(mNormalModeCount - 1, 0);
     } else {
-        normal_mode_count_++;
-        doze_mode_count_ = std::max(doze_mode_count_-1, 0);
+        mNormalModeCount++;
+        mDozeModeCount = std::max(mDozeModeCount - 1, 0);
     }
-    noop_start_tick_ = tickcount_t(false);
+    mNoopStartTick = tickcount_t(false);
 }
 
 
 bool SmartHeartbeat::__IsDozeStyle() {
-    return ((doze_mode_count_ > (2*normal_mode_count_)) && kMobile == ::getNetInfo());
+    return ((mDozeModeCount > (2 * mNormalModeCount)) && kMobile == ::getNetInfo());
 }
 
 unsigned int SmartHeartbeat::GetNextHeartbeatInterval() {  //
     // xinfo_function();
-    
-    if(ActiveLogic::Singleton::Instance()->IsActive()) {
-        last_heart_ = MinHeartInterval;
+
+    if (ActiveLogic::Singleton::Instance()->IsActive()) {
+        mLastHeart = MinHeartInterval;
         return MinHeartInterval;
     }
 
-    if (success_heart_count_ < NetStableTestCount || current_net_heart_info_.net_detail_.empty()) {
-        //        xdebug2(TSF"getNextHeartbeatInterval use MinHeartInterval. success_heart_count_=%0",success_heart_count_);
-        last_heart_ = MinHeartInterval;
+    if (mHeartSuccCount < NetStableTestCount || mCurrentHeartInfo.mNetDetail.empty()) {
+        //        xdebug2(TSF"getNextHeartbeatInterval use MinHeartInterval. mHeartSuccCount=%0",mHeartSuccCount);
+        mLastHeart = MinHeartInterval;
         return MinHeartInterval;
     }
 
-    last_heart_ = current_net_heart_info_.cur_heart_;
-    xassert2((last_heart_ < MaxHeartInterval && last_heart_ >= MinHeartInterval), "heart value invalid");
+    mLastHeart = mCurrentHeartInfo.mCurHeart;
+    xassert2((mLastHeart < MaxHeartInterval && mLastHeart >= MinHeartInterval), "heart value invalid");
 
-    if(__IsDozeStyle() && current_net_heart_info_.heart_type_ != kDozeModeHeart && last_heart_ != (MaxHeartInterval - SuccessStep)) {
-        current_net_heart_info_.cur_heart_ = last_heart_ = MinHeartInterval;
+    if (__IsDozeStyle() && mCurrentHeartInfo.mHeartType != kDozeModeHeart &&
+        mLastHeart != (MaxHeartInterval - SuccessStep)) {
+        mCurrentHeartInfo.mCurHeart = mLastHeart = MinHeartInterval;
     }
-    if(last_heart_ >= MaxHeartInterval || last_heart_ < MinHeartInterval) {
-        current_net_heart_info_.cur_heart_ = last_heart_ = MinHeartInterval;
+    if (mLastHeart >= MaxHeartInterval || mLastHeart < MinHeartInterval) {
+        mCurrentHeartInfo.mCurHeart = mLastHeart = MinHeartInterval;
     }
-    return last_heart_;
+    return mLastHeart;
 }
 
 void SmartHeartbeat::__LoadINI() {
     xinfo_function();
     std::string net_info;
     int net_type = getCurrNetLabel(net_info);
-    
+
     if (net_info.empty()) {
-        current_net_heart_info_.Clear();
+        mCurrentHeartInfo.Clear();
         xerror2("net_info NULL");
         return;
     }
-    if (net_info == current_net_heart_info_.net_detail_) return;
-    
-    current_net_heart_info_.Clear();
-    current_net_heart_info_.net_detail_ = net_info;
-    current_net_heart_info_.net_type_ = net_type;
+    if (net_info == mCurrentHeartInfo.mNetDetail) return;
 
-    if (ini_.Select(net_info)) {
-        current_net_heart_info_.last_modify_time_ = ini_.Get(kKeyModifyTime, current_net_heart_info_.last_modify_time_);
-        current_net_heart_info_.cur_heart_ = ini_.Get(kKeyCurHeart, current_net_heart_info_.cur_heart_);
-        current_net_heart_info_.fail_heart_count_ = ini_.Get(kKeyFailHeartCount, current_net_heart_info_.fail_heart_count_);
-        current_net_heart_info_.is_stable_ = ini_.Get(kKeyStable, current_net_heart_info_.is_stable_);
-        current_net_heart_info_.net_type_ = ini_.Get(kKeyNetType, current_net_heart_info_.net_type_);
-        current_net_heart_info_.heart_type_ = (TSmartHeartBeatType)ini_.Get(kKeyHeartType, 0);
-        current_net_heart_info_.min_heart_fail_count_ = ini_.Get(kKeyMinHeartFail, 0);
-        
-        xassert2(net_type == current_net_heart_info_.net_type_, "cur:%d, INI:%d", net_type, current_net_heart_info_.net_type_);
-        
-        if (current_net_heart_info_.cur_heart_ < MinHeartInterval) {
-            xerror2(TSF"current_net_heart_info_.cur_heart_:%_ < MinHeartInterval:%_", current_net_heart_info_.cur_heart_, MinHeartInterval);
-            current_net_heart_info_.cur_heart_ = MinHeartInterval;
+    mCurrentHeartInfo.Clear();
+    mCurrentHeartInfo.mNetDetail = net_info;
+    mCurrentHeartInfo.mNetType = net_type;
+
+    if (mIni.Select(net_info)) {
+        mCurrentHeartInfo.mLastModifyTime = mIni.Get(kKeyModifyTime, mCurrentHeartInfo.mLastModifyTime);
+        mCurrentHeartInfo.mCurHeart = mIni.Get(kKeyCurHeart, mCurrentHeartInfo.mCurHeart);
+        mCurrentHeartInfo.mHeartFailCount = mIni.Get(kKeyFailHeartCount,
+                                                             mCurrentHeartInfo.mHeartFailCount);
+        mCurrentHeartInfo.mIsStable = mIni.Get(kKeyStable, mCurrentHeartInfo.mIsStable);
+        mCurrentHeartInfo.mNetType = mIni.Get(kKeyNetType, mCurrentHeartInfo.mNetType);
+        mCurrentHeartInfo.mHeartType = (TSmartHeartBeatType) mIni.Get(kKeyHeartType, 0);
+        mCurrentHeartInfo.mHeartFailMinCount = mIni.Get(kKeyMinHeartFail, 0);
+
+        xassert2(net_type == mCurrentHeartInfo.mNetType, "cur:%d, INI:%d", net_type,
+                 mCurrentHeartInfo.mNetType);
+
+        if (mCurrentHeartInfo.mCurHeart < MinHeartInterval) {
+            xerror2(TSF"mCurrentHeartInfo.mCurHeart:%_ < MinHeartInterval:%_",
+                    mCurrentHeartInfo.mCurHeart, MinHeartInterval);
+            mCurrentHeartInfo.mCurHeart = MinHeartInterval;
         }
-        
-        if (current_net_heart_info_.cur_heart_ > MaxHeartInterval) {
-            xerror2(TSF"current_net_heart_info_.cur_heart_:%_ > MaxHeartInterval:%_", current_net_heart_info_.cur_heart_, MaxHeartInterval);
-            current_net_heart_info_.cur_heart_ = MaxHeartInterval - SuccessStep;
+
+        if (mCurrentHeartInfo.mCurHeart > MaxHeartInterval) {
+            xerror2(TSF"mCurrentHeartInfo.mCurHeart:%_ > MaxHeartInterval:%_",
+                    mCurrentHeartInfo.mCurHeart, MaxHeartInterval);
+            mCurrentHeartInfo.mCurHeart = MaxHeartInterval - SuccessStep;
         }
-        
+
         time_t cur_time = time(NULL);
-        
-        if (current_net_heart_info_.last_modify_time_ > cur_time) {
-            xerror2(TSF"current_net_heart_info_.last_modify_time_:%_ > cur_time:%_", current_net_heart_info_.last_modify_time_, cur_time);
-            current_net_heart_info_.last_modify_time_ = cur_time;
+
+        if (mCurrentHeartInfo.mLastModifyTime > cur_time) {
+            xerror2(TSF"mCurrentHeartInfo.mLastModifyTime:%_ > cur_time:%_",
+                    mCurrentHeartInfo.mLastModifyTime, cur_time);
+            mCurrentHeartInfo.mLastModifyTime = cur_time;
         }
     } else {
         __LimitINISize();
-        bool ret = ini_.Create(net_info);
+        bool ret = mIni.Create(net_info);
         xassert2(ret);
         __SaveINI();
     }
@@ -318,9 +335,9 @@ void SmartHeartbeat::__LoadINI() {
 
 void SmartHeartbeat::__LimitINISize() {
     xinfo_function();
-    SpecialINI::sections_t& sections =  ini_.Sections();
+    SpecialINI::sections_t &sections = mIni.Sections();
 
-    if (ini_.Sections().size() <= MAX_INI_SECTIONS)
+    if (mIni.Sections().size() <= MAX_INI_SECTIONS)
         return;
 
     xwarn2(TSF"sections.size=%0 > MAX_INI_SECTIONS=%1", sections.size(), MAX_INI_SECTIONS);
@@ -341,7 +358,7 @@ void SmartHeartbeat::__LimitINISize() {
         }
 
         time_t time_value = number_cast<time_t>(time_iter->second.c_str());
-        
+
         if (time_value > cur_time) {
             // remove dirty value
             sections.erase(iter++);
@@ -362,28 +379,30 @@ void SmartHeartbeat::__LimitINISize() {
 
 void SmartHeartbeat::__SaveINI() {
     xdebug_function();
-    if(current_net_heart_info_.net_detail_.empty())return;
-    
-    current_net_heart_info_.last_modify_time_ = time(NULL);
+    if (mCurrentHeartInfo.mNetDetail.empty())return;
 
-    ini_.Set<time_t>(kKeyModifyTime, current_net_heart_info_.last_modify_time_);
-    ini_.Set(kKeyCurHeart, current_net_heart_info_.cur_heart_);
-    ini_.Set(kKeyFailHeartCount, current_net_heart_info_.fail_heart_count_);
-    ini_.Set(kKeyStable, current_net_heart_info_.is_stable_);
-    ini_.Set(kKeyNetType, current_net_heart_info_.net_type_);
-    ini_.Set(kKeyHeartType, current_net_heart_info_.heart_type_);
-    ini_.Set(kKeyMinHeartFail, current_net_heart_info_.min_heart_fail_count_);
-    ini_.Save();
+    mCurrentHeartInfo.mLastModifyTime = time(NULL);
+
+    mIni.Set<time_t>(kKeyModifyTime, mCurrentHeartInfo.mLastModifyTime);
+    mIni.Set(kKeyCurHeart, mCurrentHeartInfo.mCurHeart);
+    mIni.Set(kKeyFailHeartCount, mCurrentHeartInfo.mHeartFailCount);
+    mIni.Set(kKeyStable, mCurrentHeartInfo.mIsStable);
+    mIni.Set(kKeyNetType, mCurrentHeartInfo.mNetType);
+    mIni.Set(kKeyHeartType, mCurrentHeartInfo.mHeartType);
+    mIni.Set(kKeyMinHeartFail, mCurrentHeartInfo.mHeartFailMinCount);
+    mIni.Save();
 }
 
 void SmartHeartbeat::__DumpHeartInfo() {
-    xinfo2(TSF"SmartHeartbeat Info last_heart_:%0,successHeartCount:%1, currSuccCount:%2", last_heart_, success_heart_count_, current_net_heart_info_.succ_heart_count_);
+    xinfo2(TSF"SmartHeartbeat Info mLastHeart:%0,successHeartCount:%1, currSuccCount:%2", mLastHeart,
+           mHeartSuccCount, mCurrentHeartInfo.mHeartSuccCount);
 
-    if (!current_net_heart_info_.net_detail_.empty()) {
+    if (!mCurrentHeartInfo.mNetDetail.empty()) {
         xinfo2(TSF"currentNetHeartInfo detail:%0,curHeart:%1,isStable:%2,failcount:%3,modifyTime:%4,type:%5,min_fail:%6",
-               current_net_heart_info_.net_detail_, current_net_heart_info_.cur_heart_, current_net_heart_info_.is_stable_,
-               current_net_heart_info_.fail_heart_count_, current_net_heart_info_.last_modify_time_
-               ,(int)current_net_heart_info_.heart_type_, current_net_heart_info_.min_heart_fail_count_);
+               mCurrentHeartInfo.mNetDetail, mCurrentHeartInfo.mCurHeart,
+               mCurrentHeartInfo.mIsStable,
+               mCurrentHeartInfo.mHeartFailCount, mCurrentHeartInfo.mLastModifyTime,
+               (int) mCurrentHeartInfo.mHeartType, mCurrentHeartInfo.mHeartFailMinCount);
     }
 }
 
@@ -396,11 +415,11 @@ NetHeartbeatInfo::NetHeartbeatInfo() {
 }
 
 void NetHeartbeatInfo::Clear() {
-    net_detail_ = "";
-    net_type_ = kNoNet;
-    last_modify_time_ = 0;
-    cur_heart_ = MinHeartInterval;
-    succ_heart_count_ = fail_heart_count_ = min_heart_fail_count_ = 0;
-    heart_type_ = kNoSmartHeartBeat;
-    is_stable_ = false;
+    mNetDetail = "";
+    mNetType = kNoNet;
+    mLastModifyTime = 0;
+    mCurHeart = MinHeartInterval;
+    mHeartSuccCount = mHeartFailCount = mHeartFailMinCount = 0;
+    mHeartType = kNoSmartHeartBeat;
+    mIsStable = false;
 }

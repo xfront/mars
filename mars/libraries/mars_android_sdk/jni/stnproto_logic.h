@@ -25,9 +25,10 @@
 namespace mars {
 namespace stn {
 
-void SetClientVersion(uint32_t _client_version);
+void SetClientVersion(uint32_t clientVersion);
 
-}}
+}
+}
 
 
 #endif /* STNPROTOCOL_INTERFACE_STNPROTO_LOGIC_H_ */

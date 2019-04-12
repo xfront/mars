@@ -62,31 +62,32 @@ enum {
     kInactive,
 };
 
-static unsigned long const sg_interval[][5]  = {
-    {5,  10, 20,  30,  300},
-    {15, 30, 240, 300, 600},
-    {0,  0,  0,   0,   0},
+static unsigned long const sg_interval[][5] = {
+        {5,  10, 20,  30,  300},
+        {15, 30, 240, 300, 600},
+        {0,  0,  0,   0,   0},
 };
 
-static int __CurActiveState(const ActiveLogic& _activeLogic) {
-    if (!_activeLogic.IsActive()) return kInactive;
+static int __CurActiveState(const ActiveLogic &activeLogic) {
+    if (!activeLogic.IsActive()) return kInactive;
 
-    if (!_activeLogic.IsForeground()) return kBackgroundActive;
+    if (!activeLogic.IsForeground()) return kBackgroundActive;
 
-    if (10 * 60 * 1000 <= ::gettickcount() - _activeLogic.LastForegroundChangeTime()) return kForgroundActive;
+    if (10 * 60 * 1000 <= ::gettickcount() - activeLogic.LastForegroundChangeTime()) return kForgroundActive;
 
-    if (60 * 1000 <= ::gettickcount() - _activeLogic.LastForegroundChangeTime()) return kForgroundTenMinute;
+    if (60 * 1000 <= ::gettickcount() - activeLogic.LastForegroundChangeTime()) return kForgroundTenMinute;
 
     return kForgroundOneMinute;
 }
 
-static unsigned long __Interval(int _type, const ActiveLogic& _activelogic) {
-    unsigned long interval = sg_interval[_type][__CurActiveState(_activelogic)];
+static unsigned long __Interval(int type, const ActiveLogic &activeLogic) {
+    unsigned long interval = sg_interval[type][__CurActiveState(activeLogic)];
 
-    if (kLongLinkConnect != _type) return interval;
+    if (kLongLinkConnect != type) return interval;
 
-    if (__CurActiveState(_activelogic) == kInactive || __CurActiveState(_activelogic) == kForgroundActive) {  // now - LastForegroundChangeTime>10min
-        if (!_activelogic.IsActive() && GetAccountInfo().username.empty()) {
+    if (__CurActiveState(activeLogic) == kInactive ||
+        __CurActiveState(activeLogic) == kForgroundActive) {  // now - LastForegroundChangeTime>10min
+        if (!activeLogic.IsActive() && GetAccountInfo().username.empty()) {
             interval = kNoAccountInfoInactiveInterval;
             xwarn2(TSF"no account info and inactive, interval:%_", interval);
 
@@ -100,43 +101,41 @@ static unsigned long __Interval(int _type, const ActiveLogic& _activelogic) {
 
         } else {
             // default value
-			interval += rand() % (20);
+            interval += rand() % (20);
         }
     }
 
     return interval;
 }
 
-#define AYNC_HANDLER asyncreg_.Get()
+#define AYNC_HANDLER mAsyncReg.Get()
 
-LongLinkConnectMonitor::LongLinkConnectMonitor(ActiveLogic& _activelogic, LongLink& _longlink, MessageQueue::MessageQueue_t _id)
-    : asyncreg_(MessageQueue::InstallAsyncHandler(_id))
-    , activelogic_(_activelogic), longlink_(_longlink), alarm_(boost::bind(&LongLinkConnectMonitor::__OnAlarm, this), _id)
-    , status_(LongLink::kDisConnected)
-    , last_connect_time_(0)
-    , last_connect_net_type_(kNoNet)
-    , thread_(boost::bind(&LongLinkConnectMonitor::__Run, this), XLOGGER_TAG"::con_mon")
-    , conti_suc_count_(0)
-    , isstart_(false) {
-    xinfo2(TSF"handler:(%_,%_)", asyncreg_.Get().queue,asyncreg_.Get().seq);
-    activelogic_.SignalActive.connect(boost::bind(&LongLinkConnectMonitor::__OnSignalActive, this, _1));
-    activelogic_.SignalForeground.connect(boost::bind(&LongLinkConnectMonitor::__OnSignalForeground, this, _1));
-    longlink_.SignalConnection.connect(boost::bind(&LongLinkConnectMonitor::__OnLongLinkStatuChanged, this, _1));
+LongLinkConnectMonitor::LongLinkConnectMonitor(ActiveLogic &activeLogic, LongLink &longLink,
+                                               MessageQueue::MessageQueue_t id)
+        : mAsyncReg(MessageQueue::InstallAsyncHandler(id)), mActiveLogic(activeLogic), mLongLink(longLink),
+          mAlarm(boost::bind(&LongLinkConnectMonitor::__OnAlarm, this), id), mStatus(LongLink::kDisConnected),
+          mLastConnectTime(0), mLastConnectNetType(kNoNet),
+          mThread(boost::bind(&LongLinkConnectMonitor::__Run, this), XLOGGER_TAG"::con_mon"), mContiSuccCount(0),
+          mIsStart(false) {
+    xinfo2(TSF"handler:(%_,%_)", mAsyncReg.Get().queue, mAsyncReg.Get().seq);
+    mActiveLogic.SignalActive.connect(boost::bind(&LongLinkConnectMonitor::__OnSignalActive, this, _1));
+    mActiveLogic.SignalForeground.connect(boost::bind(&LongLinkConnectMonitor::__OnSignalForeground, this, _1));
+    mLongLink.SignalConnection.connect(boost::bind(&LongLinkConnectMonitor::__OnLongLinkStatuChanged, this, _1));
 }
 
 LongLinkConnectMonitor::~LongLinkConnectMonitor() {
 #ifdef __APPLE__
     __StopTimer();
 #endif
-    longlink_.SignalConnection.disconnect(boost::bind(&LongLinkConnectMonitor::__OnLongLinkStatuChanged, this, _1));
-    activelogic_.SignalForeground.disconnect(boost::bind(&LongLinkConnectMonitor::__OnSignalForeground, this, _1));
-    activelogic_.SignalActive.disconnect(boost::bind(&LongLinkConnectMonitor::__OnSignalActive, this, _1));
-    asyncreg_.CancelAndWait();
+    mLongLink.SignalConnection.disconnect(boost::bind(&LongLinkConnectMonitor::__OnLongLinkStatuChanged, this, _1));
+    mActiveLogic.SignalForeground.disconnect(boost::bind(&LongLinkConnectMonitor::__OnSignalForeground, this, _1));
+    mActiveLogic.SignalActive.disconnect(boost::bind(&LongLinkConnectMonitor::__OnSignalActive, this, _1));
+    mAsyncReg.CancelAndWait();
 }
 
 bool LongLinkConnectMonitor::MakeSureConnected() {
     __IntervalConnect(kTaskConnect);
-    return LongLink::kConnected == longlink_.ConnectStatus();
+    return LongLink::kConnected == mLongLink.ConnectStatus();
 }
 
 bool LongLinkConnectMonitor::NetworkChange() {
@@ -145,9 +144,9 @@ bool LongLinkConnectMonitor::NetworkChange() {
     __StopTimer();
 
     do {
-        if (LongLink::kConnected != status_ || (::gettickcount() - last_connect_time_) <= 10 * 1000) break;
+        if (LongLink::kConnected != mStatus || (::gettickcount() - mLastConnectTime) <= 10 * 1000) break;
 
-        if (kMobile != last_connect_net_type_) break;
+        if (kMobile != mLastConnectNetType) break;
 
         int netifo = getNetInfo();
 
@@ -157,20 +156,22 @@ bool LongLinkConnectMonitor::NetworkChange() {
     } while (false);
 
 #endif
-    longlink_.Disconnect(LongLink::kNetworkChange);
+    mLongLink.Disconnect(LongLink::kNetworkChange);
     return 0 == __IntervalConnect(kNetworkChangeConnect);
 }
 
-uint64_t LongLinkConnectMonitor::__IntervalConnect(int _type) {
-    if (LongLink::kConnecting == longlink_.ConnectStatus() || LongLink::kConnected == longlink_.ConnectStatus()) return 0;
+uint64_t LongLinkConnectMonitor::__IntervalConnect(int type) {
+    if (LongLink::kConnecting == mLongLink.ConnectStatus() || LongLink::kConnected == mLongLink.ConnectStatus())
+        return 0;
 
-    uint64_t interval =  __Interval(_type, activelogic_) * 1000ULL;
-    uint64_t posttime = gettickcount() - longlink_.Profile().dns_time;
+    uint64_t interval = __Interval(type, mActiveLogic) * 1000ULL;
+    uint64_t posttime = gettickcount() - mLongLink.Profile().dnsTime;
 
     if (posttime >= interval) {
         bool newone = false;
-        bool ret = longlink_.MakeSureConnected(&newone);
-        xinfo2(TSF"made interval connect interval:%0, posttime:%_, newone:%_, connectstatus:%_, ret:%_", interval, posttime, newone, longlink_.ConnectStatus(), ret);
+        bool ret = mLongLink.MakeSureConnected(&newone);
+        xinfo2(TSF"made interval connect interval:%0, posttime:%_, newone:%_, connectstatus:%_, ret:%_", interval,
+               posttime, newone, mLongLink.ConnectStatus(), ret);
         return 0;
 
     } else {
@@ -179,54 +180,54 @@ uint64_t LongLinkConnectMonitor::__IntervalConnect(int _type) {
 }
 
 uint64_t LongLinkConnectMonitor::__AutoIntervalConnect() {
-    alarm_.Cancel();
+    mAlarm.Cancel();
     uint64_t remain = __IntervalConnect(kLongLinkConnect);
 
     if (0 == remain) return remain;
 
     xinfo2(TSF"start auto connect after:%0", remain);
-    alarm_.Start((int)remain);
+    mAlarm.Start((int) remain);
     return remain;
 }
 
 void LongLinkConnectMonitor::__OnSignalForeground(bool _isForeground) {
     ASYNC_BLOCK_START
 #ifdef __APPLE__
-    xinfo2(TSF"forground:%_ time:%_ tick:%_", _isForeground, timeMs(), gettickcount());
+                xinfo2(TSF"forground:%_ time:%_ tick:%_", _isForeground, timeMs(), gettickcount());
 
-    if (_isForeground) {
-        xinfo2(TSF"longlink:%_ time:%_ %_ %_", longlink_.ConnectStatus(), tickcount_t().gettickcount().get(), longlink_.GetLastRecvTime().get(), int64_t(tickcount_t().gettickcount() - longlink_.GetLastRecvTime()));
-        
-        if ((longlink_.ConnectStatus() == LongLink::kConnected) &&
-                (tickcount_t().gettickcount() - longlink_.GetLastRecvTime() > tickcountdiff_t(4.5 * 60 * 1000))) {
-            xwarn2(TSF"sock long time no send data, close it");
-            __ReConnect();
-        }
-    }
+                if (_isForeground) {
+                    xinfo2(TSF"longlink:%_ time:%_ %_ %_", mLongLink.ConnectStatus(), tickcount_t().gettickcount().get(), mLongLink.GetLastRecvTime().get(), int64_t(tickcount_t().gettickcount() - mLongLink.GetLastRecvTime()));
+
+                    if ((mLongLink.ConnectStatus() == LongLink::kConnected) &&
+                            (tickcount_t().gettickcount() - mLongLink.GetLastRecvTime() > tickcountdiff_t(4.5 * 60 * 1000))) {
+                        xwarn2(TSF"sock long time no send data, close it");
+                        __ReConnect();
+                    }
+                }
 
 #endif
-    __AutoIntervalConnect();
+                __AutoIntervalConnect();
     ASYNC_BLOCK_END
 }
 
-void LongLinkConnectMonitor::__OnSignalActive(bool _isactive) {
+void LongLinkConnectMonitor::__OnSignalActive(bool isActive) {
     ASYNC_BLOCK_START
-    __AutoIntervalConnect();
+                        __AutoIntervalConnect();
     ASYNC_BLOCK_END
 }
 
-void LongLinkConnectMonitor::__OnLongLinkStatuChanged(LongLink::TLongLinkStatus _status) {
-    alarm_.Cancel();
+void LongLinkConnectMonitor::__OnLongLinkStatuChanged(LongLink::TLongLinkStatus status) {
+    mAlarm.Cancel();
 
-    if (LongLink::kConnectFailed == _status || LongLink::kDisConnected == _status) {
-        alarm_.Start(500);
-    } else if (LongLink::kConnected == _status) {
+    if (LongLink::kConnectFailed == status || LongLink::kDisConnected == status) {
+        mAlarm.Start(500);
+    } else if (LongLink::kConnected == status) {
         xinfo2(TSF"cancel auto connect");
     }
 
-    status_ = _status;
-    last_connect_time_ = ::gettickcount();
-    last_connect_net_type_ = ::getNetInfo();
+    mStatus = status;
+    mLastConnectTime = ::gettickcount();
+    mLastConnectNetType = ::getNetInfo();
 }
 
 void LongLinkConnectMonitor::__OnAlarm() {
@@ -237,16 +238,16 @@ void LongLinkConnectMonitor::__OnAlarm() {
 bool LongLinkConnectMonitor::__StartTimer() {
     xdebug_function();
 
-    conti_suc_count_ = 0;
+    mContiSuccCount = 0;
 
-    ScopedLock lock(testmutex_);
-    isstart_ = true;
+    ScopedLock lock(mTestMutex);
+    mIsStart = true;
 
-    if (thread_.isruning()) {
+    if (mThread.isRunning()) {
         return true;
     }
 
-    int ret = thread_.start_periodic(kStartCheckPeriod, kTimeCheckPeriod);
+    int ret = mThread.start_periodic(kStartCheckPeriod, kTimeCheckPeriod);
     return 0 == ret;
 }
 
@@ -254,20 +255,20 @@ bool LongLinkConnectMonitor::__StartTimer() {
 bool LongLinkConnectMonitor::__StopTimer() {
     xdebug_function();
 
-    ScopedLock lock(testmutex_);
+    ScopedLock lock(mTestMutex);
 
-    if (!isstart_) return true;
+    if (!mIsStart) return true;
 
-    isstart_ = false;
+    mIsStart = false;
 
-    if (!thread_.isruning()) {
+    if (!mThread.isRunning()) {
         return true;
     }
 
-    thread_.cancel_periodic();
+    mThread.cancel_periodic();
 
 
-    thread_.join();
+    mThread.join();
     return true;
 }
 #endif
@@ -276,9 +277,9 @@ bool LongLinkConnectMonitor::__StopTimer() {
 void LongLinkConnectMonitor::__Run() {
     int netifo = getNetInfo();
 
-    if (LongLink::kConnected != status_ || (::gettickcount() - last_connect_time_) <= 12 * 1000
-            || kMobile != last_connect_net_type_ || kMobile == netifo) {
-        thread_.cancel_periodic();
+    if (LongLink::kConnected != mStatus || (::gettickcount() - mLastConnectTime) <= 12 * 1000
+        || kMobile != mLastConnectNetType || kMobile == netifo) {
+        mThread.cancelPeriodic();
         return;
     }
 
@@ -286,21 +287,21 @@ void LongLinkConnectMonitor::__Run() {
     int ret = socket_gethostbyname(NetSource::GetLongLinkHosts().front().c_str(), &dummyIpInfo, 0, NULL);
 
     if (ret == 0) {
-        ++conti_suc_count_;
+        ++mContiSuccCount;
     } else {
-        conti_suc_count_ = 0;
+        mContiSuccCount = 0;
     }
 
-    if (conti_suc_count_ >= 3) {
+    if (mContiSuccCount >= 3) {
         __ReConnect();
-        thread_.cancel_periodic();
+        mThread.cancelPeriodic();
     }
 }
 
 void LongLinkConnectMonitor::__ReConnect() {
     xinfo_function();
-    xassert2(fun_longlink_reset_);
-    fun_longlink_reset_();
+    xassert2(LongLinkResetHook);
+    LongLinkResetHook();
 }
 
 

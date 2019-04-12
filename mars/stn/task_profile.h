@@ -70,127 +70,127 @@ struct ConnectProfile {
     }
     
     void Reset(){
-        net_type.clear();
+        netType.clear();
         tid = 0;
         
-        start_time = 0;
-        dns_time = 0;
-        dns_endtime = 0;
+        startTime = 0;
+        dnsTime = 0;
+        dnsEndtime = 0;
         //todo
-        ip_items.clear();
+        ipList.clear();
         
-        conn_reason = 0;
-        conn_time = 0;
-        conn_errcode = 0;
+        connReason = 0;
+        connTime = 0;
+        connErrcode = 0;
         ip.clear();
         port = 0;
         host.clear();
-        ip_type = kIPSourceNULL;
-        conn_rtt = 0;
-        conn_cost = 0;
-        tryip_count = 0;
-        send_request_cost = 0;
-        recv_reponse_cost = 0;
+        ipType = kIPSourceNULL;
+        connRtt = 0;
+        connCost = 0;
+        tryIpCount = 0;
+        sendRequestCost = 0;
+        recvReponseCost = 0;
 
-        local_ip.clear();
-        local_port = 0;
-        ip_index = -1;
+        localIp.clear();
+        localPort = 0;
+        ipIndex = -1;
         
-        disconn_time = 0;
-        disconn_errtype = kEctOK;
-        disconn_errcode = 0;
-        disconn_signal = 0;
+        disconnTime = 0;
+        disconnErrType = kEctOK;
+        disconnErrCode = 0;
+        disconnSignal = 0;
 
         nat64 = false;
 
-        noop_profiles.clear();
-        if (extension_ptr)
-        		extension_ptr->Reset();
+        noopProfiles.clear();
+        if (profileExt)
+        		profileExt->Reset();
     }
     
-    std::string net_type;
+    std::string netType;
     intmax_t tid;
     
-    uint64_t start_time;
-    uint64_t dns_time;
-    uint64_t dns_endtime;
-    std::vector<IPPortItem> ip_items;
+    uint64_t startTime;
+    uint64_t dnsTime;
+    uint64_t dnsEndtime;
+    std::vector<IPPortItem> ipList;
     
-    int conn_reason;
-    uint64_t conn_time;
-    int conn_errcode;
-    unsigned int conn_rtt;
-    unsigned long conn_cost;
-    int tryip_count;
-    uint64_t send_request_cost;
-    uint64_t recv_reponse_cost;
+    int connReason;
+    uint64_t connTime;
+    int connErrcode;
+    unsigned int connRtt;
+    unsigned long connCost;
+    int tryIpCount;
+    uint64_t sendRequestCost;
+    uint64_t recvReponseCost;
 
     std::string ip;
     uint16_t port;
     std::string host;
-    IPSourceType ip_type;
-    std::string local_ip;
-    uint16_t local_port;
-    int ip_index;
+    IPSourceType ipType;
+    std::string localIp;
+    uint16_t localPort;
+    int ipIndex;
     
-    uint64_t disconn_time;
-    ErrCmdType disconn_errtype;
-    int disconn_errcode;
-    unsigned int disconn_signal;
+    uint64_t disconnTime;
+    ErrCmdType disconnErrType;
+    int disconnErrCode;
+    unsigned int disconnSignal;
 
     bool nat64;
 
-    std::vector<NoopProfile> noop_profiles;
+    std::vector<NoopProfile> noopProfiles;
 
-    boost::shared_ptr<ProfileExtension> extension_ptr;
-    mars::comm::ProxyInfo proxy_info;
+    boost::shared_ptr<ProfileExtension> profileExt;
+    mars::comm::ProxyInfo proxyInfo;
 };
 
         
 struct TransferProfile {
-    TransferProfile(const Task& _task):task(_task){
+    TransferProfile(const Task& task):task(task){
         Reset();
     }
     
     void Reset() {
-        connect_profile.Reset();
-        loop_start_task_time = 0;
-        first_start_send_time = 0;
-        start_send_time = 0;
-        last_receive_pkg_time = 0;
-        read_write_timeout = 0;
-        first_pkg_timeout = 0;
+        connectProfile.Reset();
+        loopStartTaskTime = 0;
+        firstStartSendTime = 0;
+        startSendTime = 0;
+        lastReceivePkgTime = 0;
+        readWriteTimeout = 0;
+        firstPkgTimeout = 0;
         
-        sent_size = 0;
-        send_data_size = 0;
-        received_size = 0;
-        receive_data_size = 0;
+        sentSize = 0;
+        sendDataSize = 0;
+        receivedSize = 0;
+        receiveDataSize = 0;
         
-        external_ip.clear();
+        externalIp.clear();
         
-        error_type = 0;
-        error_code = 0;
+        errorType = 0;
+        errorCode = 0;
     }
     
     const Task& task;
-    ConnectProfile connect_profile;
+    ConnectProfile connectProfile;
     
-    uint64_t loop_start_task_time;  // ms
-    uint64_t first_start_send_time; //ms
-    uint64_t start_send_time;    // ms
-    uint64_t last_receive_pkg_time;  // ms
-    uint64_t read_write_timeout;    // ms
-    uint64_t first_pkg_timeout;  // ms
+    uint64_t loopStartTaskTime;  // ms
+    uint64_t firstStartSendTime; //ms
+    uint64_t startSendTime;    // ms
+    uint64_t lastReceivePkgTime;  // ms
+    uint64_t readWriteTimeout;    // ms
+    uint64_t firstPkgTimeout;  // ms
     
-    size_t sent_size;
-    size_t send_data_size;
-    size_t received_size;
-    size_t receive_data_size;
+    size_t sentSize;
+    size_t sendDataSize;
+    size_t receivedSize;
+    size_t receiveDataSize;
     
-    std::string external_ip;
+    std::string externalIp;
     
-    int error_type;
-    int error_code;
+    int errorType;
+    int errorCode;
 };
     
 //do not insert or delete
@@ -208,102 +208,102 @@ enum TaskFailStep {
         
 struct TaskProfile {
     
-    static uint64_t ComputeTaskTimeout(const Task& _task) {
+    static uint64_t ComputeTaskTimeout(const Task& task) {
         uint64_t readwritetimeout = 15 * 1000;
         
-        if (0 < _task.server_process_cost)
-            readwritetimeout = _task.server_process_cost + 15 * 1000;
+        if (0 < task.serverProcessCost)
+            readwritetimeout = task.serverProcessCost + 15 * 1000;
         
         int trycount = 0;// DEF_TASK_RETRY_COUNT;
         
-        if (0 <= _task.retry_count)
-            trycount = _task.retry_count;
+        if (0 <= task.retryCount)
+            trycount = task.retryCount;
         
         trycount++;
         
         uint64_t task_timeout = (readwritetimeout + 5 * 1000) * trycount;
         
-        if (0 < _task.total_timetout &&  (uint64_t)_task.total_timetout < task_timeout)
-            task_timeout = _task.total_timetout;
+        if (0 < task.totalTimetout &&  (uint64_t)task.totalTimetout < task_timeout)
+            task_timeout = task.totalTimetout;
         
         return  task_timeout;
     }
     
-    TaskProfile(const Task& _task):task(_task), transfer_profile(task), task_timeout(ComputeTaskTimeout(_task)), start_task_time(::gettickcount()){
+    TaskProfile(const Task& task):task(task), transferProfile(task), taskTimeout(ComputeTaskTimeout(task)), startTaskTime(::gettickcount()){
         
-        remain_retry_count = task.retry_count;
-        force_no_retry = false;
+        remainRetryCount = task.retryCount;
+        forceNoRetry = false;
         
-        running_id = 0;
+        runningId = 0;
         
-        end_task_time = 0;
-        retry_start_time = 0;
+        endTaskTime = 0;
+        retryStartTime = 0;
 
-        last_failed_dyntime_status = 0;
-        current_dyntime_status = 0;
+        lastFailedDyntimeStatus = 0;
+        currentDyntimeStatus = 0;
         
-        antiavalanche_checked = false;
+        antiAvalancheChecked = false;
         
-        use_proxy = false;
-        retry_time_interval = 0;
+        useProxy = false;
+        retryTimeInterval = 0;
 
-        err_type = kEctOK;
-        err_code = 0;
-        link_type = 0;
+        errType = kEctOK;
+        errCode = 0;
+        linkType = 0;
     }
     
     void InitSendParam() {
-        transfer_profile.Reset();
-        running_id = 0;
+        transferProfile.Reset();
+        runningId = 0;
     }
     
     void PushHistory() {
-        history_transfer_profiles.push_back(transfer_profile);
+        historyTransferProfiles.push_back(transferProfile);
     }
     
     TaskFailStep GetFailStep() const {
-        if(kEctOK == err_type && 0 == err_code) return kStepSucc;
-        if(kEctDns == err_type) return kStepDns;
-        if(transfer_profile.connect_profile.ip_index == -1) return kStepConnect;
-        if(transfer_profile.last_receive_pkg_time == 0) return kStepFirstPkg;
-        if(kEctEnDecode == err_type)    return kStepDecode;
-        if(kEctSocket == err_type || kEctHttp == err_type || kEctNetMsgXP == err_type)  return kStepPkgPkg;
-        if(kEctLocalTaskTimeout == err_code)    return kStepTimeout;
-        if(kEctServer == err_type || (kEctOK == err_type && err_code != 0))    return kStepServer;
+        if(kEctOK == errType && 0 == errCode) return kStepSucc;
+        if(kEctDns == errType) return kStepDns;
+        if(transferProfile.connectProfile.ipIndex == -1) return kStepConnect;
+        if(transferProfile.lastReceivePkgTime == 0) return kStepFirstPkg;
+        if(kEctEnDecode == errType)    return kStepDecode;
+        if(kEctSocket == errType || kEctHttp == errType || kEctNetMsgXP == errType)  return kStepPkgPkg;
+        if(kEctLocalTaskTimeout == errCode)    return kStepTimeout;
+        if(kEctServer == errType || (kEctOK == errType && errCode != 0))    return kStepServer;
         return kStepOther;
     }
 
     const Task task;
-    TransferProfile transfer_profile;
-    intptr_t running_id;
+    TransferProfile transferProfile;
+    intptr_t runningId;
     
-    const uint64_t task_timeout;
-    const uint64_t start_task_time;  // ms
-    uint64_t end_task_time;	//ms
-    uint64_t retry_start_time;
+    const uint64_t taskTimeout;
+    const uint64_t startTaskTime;  // ms
+    uint64_t endTaskTime;	//ms
+    uint64_t retryStartTime;
 
-    int remain_retry_count;
-    bool force_no_retry;
+    int remainRetryCount;
+    bool forceNoRetry;
     
-    int last_failed_dyntime_status;
-    int current_dyntime_status;
+    int lastFailedDyntimeStatus;
+    int currentDyntimeStatus;
     
-    bool antiavalanche_checked;
+    bool antiAvalancheChecked;
     
-    bool use_proxy;
-    uint64_t retry_time_interval;    // ms
+    bool useProxy;
+    uint64_t retryTimeInterval;    // ms
 
-    ErrCmdType err_type;
-    int err_code;
-    int link_type;
+    ErrCmdType errType;
+    int errCode;
+    int linkType;
 
-    std::vector<TransferProfile> history_transfer_profiles;
+    std::vector<TransferProfile> historyTransferProfiles;
 };
         
 
-void __SetLastFailedStatus(std::list<TaskProfile>::iterator _it);
+void __SetLastFailedStatus(std::list<TaskProfile>::iterator it);
 uint64_t __ReadWriteTimeout(uint64_t  _first_pkg_timeout);
-uint64_t  __FirstPkgTimeout(int64_t  _init_first_pkg_timeout, size_t _sendlen, int _send_count, int _dynamictimeout_status);
+uint64_t  __FirstPkgTimeout(int64_t  initFirstPkgTimeout, size_t sendLen, int sendCount, int dynamicTimeoutStatus);
 bool __CompareTask(const TaskProfile& _first, const TaskProfile& _second);
 }}
 

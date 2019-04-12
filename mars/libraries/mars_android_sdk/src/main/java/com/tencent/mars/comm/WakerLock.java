@@ -5,7 +5,7 @@ import android.os.Handler;
 import android.os.PowerManager;
 
 public class WakerLock {
-	private static final String TAG = "MicroMsg.WakerLock";
+	private static final String TAG = "MicroMsg:WakerLock";
 
 	private PowerManager.WakeLock wakeLock = null;
 	private Handler mHandler = null;

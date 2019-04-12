@@ -38,42 +38,48 @@ namespace sdt {
 class BaseChecker;
 
 class SdtCore {
-  public:
+public:
     SINGLETON_INTRUSIVE(SdtCore, new SdtCore, delete);
 
-  public:
+public:
 
-    void StartCheck(CheckIPPorts& _longlink_items, CheckIPPorts& _shortlink_items, int _mode, int _timeout = UNUSE_TIMEOUT);
+    void
+    StartCheck(CheckIPPorts &_longlink_items, CheckIPPorts &_shortlink_items, int _mode, int _timeout = UNUSE_TIMEOUT);
+
     /*
      * Stop and cancel net check.
      */
     void CancelCheck();
+
     void CancelAndWait();
 
-  private:
+private:
     SdtCore();
+
     virtual ~SdtCore();
 
-    void __InitCheckReq(CheckIPPorts& _longlink_items, CheckIPPorts& _shortlink_items, int _mode, int _timeout);
+    void __InitCheckReq(CheckIPPorts &_longlink_items, CheckIPPorts &_shortlink_items, int _mode, int _timeout);
+
     void __Reset();
 
     // Run on.
     void __RunOn();
-    
+
     void __DumpCheckResult();
 
-  private:
+private:
     //  MessageQueue::ScopeRegister     async_reg_;
     Thread thread_;
 
-    std::list<BaseChecker*>   check_list_;
+    std::list<BaseChecker *> check_list_;
 
-    CheckRequestProfile		  check_request_;
-    volatile bool             cancel_;
-    volatile bool             checking_;
-    Mutex					  checking_mutex_;
+    CheckRequestProfile check_request_;
+    volatile bool cancel_;
+    volatile bool checking_;
+    Mutex checking_mutex_;
 };
 
-}}
+}
+}
 
 #endif /* SDT_SRC_ACTIVECHECK_NETCHECKER_SERVICE_H_ */

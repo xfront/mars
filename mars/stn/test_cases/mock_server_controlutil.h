@@ -39,13 +39,13 @@ class MockServerControlUtils
 {
 	//startxxxϵ�к�������������server������status��־λ     killXXXϵ�к����ǹر�server���������־λ    stopXXXϵ�к����Ƿ���8888 TASK�� �������־λ
 public:
-static void setServerStatus(std::string _ip, uint16_t _port, bool& _isRunning)//_isRunning������������� ���Ϊserver��oldStatus
+static void setServerStatus(std::string ip, uint16_t port, bool& _isRunning)//_isRunning������������� ���Ϊserver��oldStatus
 {
 	bool oldStatus = false;
 	std::vector<ServerStatusItem>::iterator iter = sg_ServerStatusTable.begin();
 	for(;iter!=sg_ServerStatusTable.end();++iter)
 	{
-		if(iter->strIP==_ip && iter->nPort==_port)
+		if(iter->strIP==ip && iter->nPort==port)
 		{
 			oldStatus = iter->isRunning;
 			iter->isRunning = _isRunning;
@@ -55,7 +55,7 @@ static void setServerStatus(std::string _ip, uint16_t _port, bool& _isRunning)//
 
 	if(iter == sg_ServerStatusTable.end())
 	{
-		ServerStatusItem tempItem(_ip.c_str(), _port, _isRunning);
+		ServerStatusItem tempItem(ip.c_str(), port, _isRunning);
 		sg_ServerStatusTable.push_back(tempItem);
 	}
 

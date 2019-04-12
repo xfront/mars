@@ -30,20 +30,24 @@ namespace mars {
 namespace sdt {
 
 class TcpChecker : public BaseChecker {
-  public:
+public:
     TcpChecker();
+
     virtual ~TcpChecker();
 
-    virtual int StartDoCheck(CheckRequestProfile& _check_request);
+    virtual int StartDoCheck(CheckRequestProfile &_check_request);
 
-  protected:
-    virtual void __DoCheck(CheckRequestProfile& _check_request);
+protected:
+    virtual void __DoCheck(CheckRequestProfile &_check_request);
 
-  private:
-    void __NoopReq(AutoBuffer& noop_send);
-    bool __NoopResp(const AutoBuffer& _packed, uint32_t& _cmdid, uint32_t& _seq, size_t& _package_len, AutoBuffer& _body);
+private:
+    void __NoopReq(AutoBuffer &noop_send);
+
+    bool
+    __NoopResp(const AutoBuffer &_packed, uint32_t &_cmdid, uint32_t &_seq, size_t &_package_len, AutoBuffer &_body);
 };
 
-}}
+}
+}
 
-#endif	//SDT_SRC_ACTIVECHECK_TCPCHEKER_H_
+#endif    //SDT_SRC_ACTIVECHECK_TCPCHEKER_H_

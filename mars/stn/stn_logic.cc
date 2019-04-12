@@ -52,8 +52,8 @@ namespace stn {
 static Callback* sg_callback = NULL;
 static const std::string kLibName = "stn";
 
-boost::signals2::signal<void (ErrCmdType _err_type, int _err_code, const std::string& _ip, uint16_t _port)> SignalOnLongLinkNetworkError;
-boost::signals2::signal<void (ErrCmdType _err_type, int _err_code, const std::string& _ip, const std::string& _host, uint16_t _port)> SignalOnShortLinkNetworkError;
+boost::signals2::signal<void (ErrCmdType errType, int errCode, const std::string& ip, uint16_t port)> SignalOnLongLinkNetworkError;
+boost::signals2::signal<void (ErrCmdType errType, int errCode, const std::string& ip, const std::string& host, uint16_t port)> SignalOnShortLinkNetworkError;
 
 #define STN_WEAK_CALL(func) \
     boost::shared_ptr<NetCore> stn_ptr = NetCore::Singleton::Instance_Weak().lock();\
@@ -154,20 +154,20 @@ void SetCallback(Callback* const callback) {
 	sg_callback = callback;
 }
 
-bool (*StartTask)(const Task& _task)
-= [](const Task& _task) {
-    STN_RETURN_WEAK_CALL(StartTask(_task));
+bool (*StartTask)(const Task& task)
+= [](const Task& task) {
+    STN_RETURN_WEAK_CALL(StartTask(task));
 };
 
-void (*StopTask)(uint32_t _taskid)
-= [](uint32_t _taskid) {
-    STN_WEAK_CALL(StopTask(_taskid));
+void (*StopTask)(uint32_t taskId)
+= [](uint32_t taskId) {
+    STN_WEAK_CALL(StopTask(taskId));
 };
 
-bool (*HasTask)(uint32_t _taskid)
-= [](uint32_t _taskid) {
+bool (*HasTask)(uint32_t taskId)
+= [](uint32_t taskId) {
 	bool has_task = false;
-	STN_WEAK_CALL_RETURN(HasTask(_taskid), has_task);
+	STN_WEAK_CALL_RETURN(HasTask(taskId), has_task);
 	return has_task;
 };
 
@@ -201,10 +201,10 @@ bool (*LongLinkIsConnected)()
     return connected;
 };
     
-bool (*ProxyIsAvailable)(const mars::comm::ProxyInfo& _proxy_info, const std::string& _test_host, const std::vector<std::string>& _hardcode_ips)
-= [](const mars::comm::ProxyInfo& _proxy_info, const std::string& _test_host, const std::vector<std::string>& _hardcode_ips){
+bool (*ProxyIsAvailable)(const mars::comm::ProxyInfo& proxyInfo, const std::string& testHost, const std::vector<std::string>& hardCodeIps)
+= [](const mars::comm::ProxyInfo& proxyInfo, const std::string& testHost, const std::vector<std::string>& hardCodeIps){
     
-    return ProxyTest::Singleton::Instance()->ProxyIsAvailable(_proxy_info, _test_host, _hardcode_ips);
+    return ProxyTest::Singleton::Instance()->ProxyIsAvailable(proxyInfo, testHost, hardCodeIps);
 };
 
 //void SetLonglinkSvrAddr(const std::string& host, const std::vector<uint16_t> ports)
@@ -242,9 +242,9 @@ void (*SetBackupIPs)(const std::string& host, const std::vector<std::string>& ip
 	NetSource::SetBackupIPs(host, iplist);
 };
 
-void (*SetSignallingStrategy)(long _period, long _keepTime)
-= [](long _period, long _keepTime) {
-    SignallingKeeper::SetStrategy((unsigned int)_period, (unsigned int)_keepTime);
+void (*SetSignallingStrategy)(long period, long keepTime)
+= [](long period, long keepTime) {
+    SignallingKeeper::SetStrategy((unsigned int)period, (unsigned int)keepTime);
 };
 
 void (*KeepSignalling)()
@@ -291,60 +291,60 @@ std::vector<std::string> (*OnNewDns)(const std::string& host)
 };
 
 //网络层收到push消息回调
-void (*OnPush)(uint64_t _channel_id, uint32_t _cmdid, uint32_t _taskid, const AutoBuffer& _body, const AutoBuffer& _extend)
-= [](uint64_t _channel_id, uint32_t _cmdid, uint32_t _taskid, const AutoBuffer& _body, const AutoBuffer& _extend) {
+void (*OnPush)(uint64_t channelId, uint32_t cmdId, uint32_t taskId, const AutoBuffer& body, const AutoBuffer& bufExt)
+= [](uint64_t channelId, uint32_t cmdId, uint32_t taskId, const AutoBuffer& body, const AutoBuffer& bufExt) {
 	xassert2(sg_callback != NULL);
-	sg_callback->OnPush(_channel_id, _cmdid, _taskid, _body, _extend);
+	sg_callback->OnPush(channelId, cmdId, taskId, body, bufExt);
 };
 //底层获取task要发送的数据 
-bool (*Req2Buf)(uint32_t taskid,  void* const user_context, AutoBuffer& outbuffer, AutoBuffer& extend, int& error_code, const int channel_select)
-= [](uint32_t taskid,  void* const user_context, AutoBuffer& outbuffer, AutoBuffer& extend, int& error_code, const int channel_select) {
+bool (*Req2Buf)(uint32_t taskId,  void* const userContext, AutoBuffer& outbuffer, AutoBuffer& extend, int& error_code, const int channelSelect)
+= [](uint32_t taskId,  void* const userContext, AutoBuffer& outbuffer, AutoBuffer& extend, int& error_code, const int channelSelect) {
 	xassert2(sg_callback != NULL);
-	return sg_callback->Req2Buf(taskid, user_context, outbuffer, extend, error_code, channel_select);
+	return sg_callback->Req2Buf(taskId, userContext, outbuffer, extend, error_code, channelSelect);
 };
 //底层回包返回给上层解析 
-int (*Buf2Resp)(uint32_t taskid, void* const user_context, const AutoBuffer& inbuffer, const AutoBuffer& extend, int& error_code, const int channel_select)
-= [](uint32_t taskid, void* const user_context, const AutoBuffer& inbuffer, const AutoBuffer& extend, int& error_code, const int channel_select) {
+int (*Buf2Resp)(uint32_t taskId, void* const userContext, const AutoBuffer& inbuffer, const AutoBuffer& extend, int& error_code, const int channelSelect)
+= [](uint32_t taskId, void* const userContext, const AutoBuffer& inbuffer, const AutoBuffer& extend, int& error_code, const int channelSelect) {
 	xassert2(sg_callback != NULL);
-	return sg_callback->Buf2Resp(taskid, user_context, inbuffer, extend, error_code, channel_select);
+	return sg_callback->Buf2Resp(taskId, userContext, inbuffer, extend, error_code, channelSelect);
 };
 //任务执行结束 
-int  (*OnTaskEnd)(uint32_t taskid, void* const user_context, int error_type, int error_code)
-= [](uint32_t taskid, void* const user_context, int error_type, int error_code) {
+int  (*OnTaskEnd)(uint32_t taskId, void* const userContext, int error_type, int error_code)
+= [](uint32_t taskId, void* const userContext, int error_type, int error_code) {
 	xassert2(sg_callback != NULL);
-	return sg_callback->OnTaskEnd(taskid, user_context, error_type, error_code);
+	return sg_callback->OnTaskEnd(taskId, userContext, error_type, error_code);
  };
 
 //上报网络连接状态 
-void (*ReportConnectStatus)(int status, int longlink_status)
-= [](int status, int longlink_status) {
+void (*ReportConnectStatus)(int status, int longLinkStatus)
+= [](int status, int longLinkStatus) {
 	xassert2(sg_callback != NULL);
-	sg_callback->ReportConnectStatus(status, longlink_status);
+	sg_callback->ReportConnectStatus(status, longLinkStatus);
 };
 
-void (*OnLongLinkStatusChange)(int _status)
-= [](int _status) {
+void (*OnLongLinkStatusChange)(int status)
+= [](int status) {
     xassert2(sg_callback != NULL);
-    sg_callback->OnLongLinkStatusChange(_status);
+    sg_callback->OnLongLinkStatusChange(status);
 };
-void (*OnLongLinkNetworkError)(ErrCmdType _err_type, int _err_code, const std::string& _ip, uint16_t _port)
-= [](ErrCmdType _err_type, int _err_code, const std::string& _ip, uint16_t _port) {
+void (*OnLongLinkNetworkError)(ErrCmdType errType, int errCode, const std::string& ip, uint16_t port)
+= [](ErrCmdType errType, int errCode, const std::string& ip, uint16_t port) {
     xassert2(sg_callback != NULL);
-    SignalOnLongLinkNetworkError(_err_type, _err_code, _ip, _port);
-    sg_callback->OnLongLinkNetworkError(_err_type, _err_code, _ip, _port);
+    SignalOnLongLinkNetworkError(errType, errCode, ip, port);
+    sg_callback->OnLongLinkNetworkError(errType, errCode, ip, port);
 };
     
-void (*OnShortLinkNetworkError)(ErrCmdType _err_type, int _err_code, const std::string& _ip, const std::string& _host, uint16_t _port)
-= [](ErrCmdType _err_type, int _err_code, const std::string& _ip, const std::string& _host, uint16_t _port) {
+void (*OnShortLinkNetworkError)(ErrCmdType errType, int errCode, const std::string& ip, const std::string& host, uint16_t port)
+= [](ErrCmdType errType, int errCode, const std::string& ip, const std::string& host, uint16_t port) {
     xassert2(sg_callback != NULL);
-    SignalOnShortLinkNetworkError(_err_type, _err_code, _ip, _host, _port);
-    sg_callback->OnShortLinkNetworkError(_err_type, _err_code, _ip, _host, _port);
+    SignalOnShortLinkNetworkError(errType, errCode, ip, host, port);
+    sg_callback->OnShortLinkNetworkError(errType, errCode, ip, host, port);
 };
 //长连信令校验 ECHECK_NOW = 0, ECHECK_NEVER = 1, ECHECK_NEXT = 2
-int  (*GetLonglinkIdentifyCheckBuffer)(AutoBuffer& identify_buffer, AutoBuffer& buffer_hash, int32_t& cmdid)
-= [](AutoBuffer& identify_buffer, AutoBuffer& buffer_hash, int32_t& cmdid) {
+int  (*GetLonglinkIdentifyCheckBuffer)(AutoBuffer& bufIdentify, AutoBuffer& buffer_hash, int32_t& cmdid)
+= [](AutoBuffer& bufIdentify, AutoBuffer& buffer_hash, int32_t& cmdid) {
 	xassert2(sg_callback != NULL);
-	return sg_callback->GetLonglinkIdentifyCheckBuffer(identify_buffer, buffer_hash, cmdid);
+	return sg_callback->GetLonglinkIdentifyCheckBuffer(bufIdentify, buffer_hash, cmdid);
 };
 //长连信令校验回包
 bool (*OnLonglinkIdentifyResponse)(const AutoBuffer& response_buffer, const AutoBuffer& identify_buffer_hash)
@@ -359,20 +359,20 @@ void (*RequestSync)()
 	sg_callback->RequestSync();
 };
 
-void (*RequestNetCheckShortLinkHosts)(std::vector<std::string>& _hostlist)
-= [](std::vector<std::string>& _hostlist) {
+void (*RequestNetCheckShortLinkHosts)(std::vector<std::string>& hostList)
+= [](std::vector<std::string>& hostList) {
 };
 
-void (*ReportTaskProfile)(const TaskProfile& _task_profile)
-= [](const TaskProfile& _task_profile) {
+void (*ReportTaskProfile)(const TaskProfile& taskProfile)
+= [](const TaskProfile& taskProfile) {
 };
 
-void (*ReportTaskLimited)(int _check_type, const Task& _task, unsigned int& _param)
-= [](int _check_type, const Task& _task, unsigned int& _param) {
+void (*ReportTaskLimited)(int checkType, const Task& task, unsigned int& param)
+= [](int checkType, const Task& task, unsigned int& param) {
 };
 
-void (*ReportDnsProfile)(const DnsProfile& _dns_profile)
-= [](const DnsProfile& _dns_profile) {
+void (*ReportDnsProfile)(const DnsProfile& dnsProfile)
+= [](const DnsProfile& dnsProfile) {
 };
 #endif
 

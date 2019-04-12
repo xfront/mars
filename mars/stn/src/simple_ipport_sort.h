@@ -34,47 +34,60 @@ namespace mars {
 namespace stn {
 
 struct BanItem;
-    
+
 class SimpleIPPortSort {
-  public:
+public:
     SimpleIPPortSort();
+
     ~SimpleIPPortSort();
 
-    void InitHistory2BannedList(bool _savexml);
-    void RemoveBannedList(const std::string& _ip);
-    void Update(const std::string& _ip, uint16_t _port, bool _is_success);
+    void InitHistory2BannedList(bool saveXml);
 
-    void SortandFilter(std::vector<IPPortItem>& _items, int _needcount) const;
+    void RemoveBannedList(const std::string &ip);
 
-    void AddServerBan(const std::string& _ip);
-    
-  private:
+    void Update(const std::string &ip, uint16_t port, bool isSuccess);
+
+    void SortandFilter(std::vector<IPPortItem> &items, int needCount) const;
+
+    void AddServerBan(const std::string &ip);
+
+private:
     void __LoadXml();
+
     void __SaveXml();
+
     void __RemoveTimeoutXml();
 
-    std::vector<BanItem>::iterator __FindBannedIter(const std::string& _ip, uint16_t _port) const;
-    bool __IsBanned(std::vector<BanItem>::iterator _iter) const;
-    bool __IsBanned(const std::string& _ip, uint16_t _port) const;
-    void __UpdateBanList(bool _isSuccess, const std::string& _ip, uint16_t _port);
-    bool __CanUpdate(const std::string& _ip, uint16_t _port, bool _is_success) const;
+    std::vector<BanItem>::iterator __FindBannedIter(const std::string &ip, uint16_t port) const;
 
-    void __FilterbyBanned(std::vector<IPPortItem>& _items) const;
-    void __SortbyBanned(std::vector<IPPortItem>& _items) const;
-    bool __IsServerBan(const std::string& _ip) const;
-    
-  private:
-    SimpleIPPortSort(const SimpleIPPortSort&);
-    SimpleIPPortSort& operator=(const SimpleIPPortSort&);
+    bool __IsBanned(std::vector<BanItem>::iterator it) const;
 
-  private:
-    std::string hostpath_;
-    tinyxml2::XMLDocument recordsxml_;
+    bool __IsBanned(const std::string &ip, uint16_t port) const;
 
-    mutable Mutex mutex_;
-    mutable std::vector<BanItem> _ban_fail_list_;
-    mutable std::map<std::string, uint64_t> _server_bans_;
+    void __UpdateBanList(bool isSuccess, const std::string &ip, uint16_t port);
+
+    bool __CanUpdate(const std::string &ip, uint16_t port, bool isSuccess) const;
+
+    void __FilterbyBanned(std::vector<IPPortItem> &items) const;
+
+    void __SortbyBanned(std::vector<IPPortItem> &items) const;
+
+    bool __IsServerBan(const std::string &ip) const;
+
+private:
+    SimpleIPPortSort(const SimpleIPPortSort &);
+
+    SimpleIPPortSort &operator=(const SimpleIPPortSort &);
+
+private:
+    std::string mHostPath;
+    tinyxml2::XMLDocument mRecordsXml;
+
+    mutable Mutex mMutex;
+    mutable std::vector<BanItem> mBanFailList;
+    mutable std::map<std::string, uint64_t> mServerBans;
 };
 
-}}
+}
+}
 #endif // STN_SRC_SIMPLE_IPPORT_SORT_H_

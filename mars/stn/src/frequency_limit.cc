@@ -36,46 +36,48 @@
 using namespace mars::stn;
 
 FrequencyLimit::FrequencyLimit()
-    : itime_record_clear_(::gettickcount())
-{}
+        : mTimeRecordClear(::gettickcount()) {
 
-FrequencyLimit::~FrequencyLimit()
-{}
+}
 
-bool FrequencyLimit::Check(const mars::stn::Task& _task, const void* _buffer, int _len, unsigned int& _span) {
+FrequencyLimit::~FrequencyLimit() {}
+
+bool FrequencyLimit::Check(const mars::stn::Task &task, const void *buffer, int len, unsigned int &span) {
     xverbose_function();
 
-    if (!_task.limit_frequency) return true;
+    if (!task.limitFrequency) return true;
 
     unsigned long time_cur = ::gettickcount();
-    xassert2(time_cur >= itime_record_clear_);
-    unsigned long interval = time_cur - itime_record_clear_;
+    xassert2(time_cur >= mTimeRecordClear);
+    unsigned long interval = time_cur - mTimeRecordClear;
 
     if (RUN_CLEAR_RECORDS_INTERVAL_MINUTE <= interval) {
-        xdebug2(TSF"__ClearRecord interval=%0, timeCur=%1, itimeRecordClear=%2", interval, time_cur, itime_record_clear_);
-        itime_record_clear_ = time_cur;
+        xdebug2(TSF"__ClearRecord interval=%0, timeCur=%1, itimeRecordClear=%2", interval, time_cur,
+                mTimeRecordClear);
+        mTimeRecordClear = time_cur;
         __ClearRecord();
     }
 
-    unsigned long hash = ::adler32(0, (const unsigned char*)_buffer, _len);
+    unsigned long hash = ::adler32(0, (const unsigned char *) buffer, len);
     int find_index = __LocateIndex(hash);
 
     if (0 <= find_index) {
-    	_span = __GetLastUpdateTillNow(find_index);
+        span = __GetLastUpdateTillNow(find_index);
         __UpdateRecord(find_index);
 
         if (!__CheckRecord(find_index)) {
-            xerror2(TSF"Anti-Avalanche had Catch Task, Task Info: ptr=%0, cmdid=%1, need_authed=%2, cgi:%3, channel_select=%4, limit_flow=%5",
-                    &_task, _task.cmdid, _task.need_authed, _task.cgi, _task.channel_select, _task.limit_flow);
+            xerror2(TSF"Anti-Avalanche had Catch Task, Task Info: ptr=%0, cmdid=%1, need_authed=%2, cgi:%3, channelSelect=%4, limit_flow=%5",
+                    &task, task.cmdId, task.needAuthed, task.cgi, task.channelSelect, task.limitFlow);
             xerror2(TSF"apBuffer Len=%0, Hash=%1, Count=%2, timeLastUpdate=%3",
-                    _len, iarr_record_[find_index].hash_, iarr_record_[find_index].count_, iarr_record_[find_index].time_last_update_);
+                    len, mRecordList[find_index].hash, mRecordList[find_index].count,
+                    mRecordList[find_index].lastUpdateTime);
             xassert2(false);
 
             return false;
         }
     } else {
-        xdebug2(TSF"InsertRecord Task Info: ptr=%0, cmdid=%1, need_authed=%2, cgi:%3, channel_select=%4, limit_flow=%5",
-                &_task, _task.cmdid, _task.need_authed, _task.cgi, _task.channel_select, _task.limit_flow);
+        xdebug2(TSF"InsertRecord Task Info: ptr=%0, cmdid=%1, need_authed=%2, cgi:%3, channelSelect=%4, limit_flow=%5",
+                &task, task.cmdId, task.needAuthed, task.cgi, task.channelSelect, task.limitFlow);
 
         __InsertRecord(hash);
     }
@@ -84,80 +86,81 @@ bool FrequencyLimit::Check(const mars::stn::Task& _task, const void* _buffer, in
 }
 
 void FrequencyLimit::__ClearRecord() {
-    xdebug2(TSF"iarrRecord size=%0", iarr_record_.size());
+    xdebug2(TSF"iarrRecord size=%0", mRecordList.size());
 
     unsigned long time_cur = ::gettickcount();
 
-    std::vector<STAvalancheRecord>::iterator first = iarr_record_.begin();
+    std::vector<STAvalancheRecord>::iterator first = mRecordList.begin();
 
-    while (first != iarr_record_.end()) {
-        xassert2(time_cur >= first->time_last_update_);
-        unsigned long interval = time_cur - first->time_last_update_;
+    while (first != mRecordList.end()) {
+        xassert2(time_cur >= first->lastUpdateTime);
+        unsigned long interval = time_cur - first->lastUpdateTime;
 
-        if (interval <= NOT_CLEAR_INTERCEPT_INTERVAL_MINUTE && NOT_CLEAR_INTERCEPT_COUNT <= first->count_) {
-            int oldcount = first->count_;
+        if (interval <= NOT_CLEAR_INTERCEPT_INTERVAL_MINUTE && NOT_CLEAR_INTERCEPT_COUNT <= first->count) {
+            int oldcount = first->count;
 
-            if (NOT_CLEAR_INTERCEPT_COUNT_RETRY < first->count_) first->count_ = NOT_CLEAR_INTERCEPT_COUNT_RETRY;
+            if (NOT_CLEAR_INTERCEPT_COUNT_RETRY < first->count) first->count = NOT_CLEAR_INTERCEPT_COUNT_RETRY;
 
-            xwarn2(TSF"timeCur:%_,  first->timeLastUpdate:%_, interval:%_, Hash:%_, oldcount:%_, Count:%_", time_cur, first->time_last_update_, interval, first->hash_, oldcount, first->count_);
+            xwarn2(TSF"timeCur:%_,  first->timeLastUpdate:%_, interval:%_, Hash:%_, oldcount:%_, Count:%_",
+                   time_cur, first->lastUpdateTime, interval, first->hash, oldcount, first->count);
             ++first;
         } else {
-            first = iarr_record_.erase(first);
+            first = mRecordList.erase(first);
         }
     }
 }
 
-int FrequencyLimit::__LocateIndex(unsigned long _hash) const {
-    for (int i = (int)iarr_record_.size() - 1; i >= 0; --i) {
-        if (iarr_record_[i].hash_ == _hash)
+int FrequencyLimit::__LocateIndex(unsigned long hash) const {
+    for (int i = (int) mRecordList.size() - 1; i >= 0; --i) {
+        if (mRecordList[i].hash == hash)
             return i;
     }
 
     return -1;
 }
 
-void FrequencyLimit::__InsertRecord(unsigned long _hash) {
-    if (MAX_RECORD_COUNT < iarr_record_.size()) {
+void FrequencyLimit::__InsertRecord(unsigned long hash) {
+    if (MAX_RECORD_COUNT < mRecordList.size()) {
         xassert2(false);
         return;
     }
 
     STAvalancheRecord temp;
-    temp.count_ = 1;
-    temp.hash_ = _hash;
-    temp.time_last_update_ = ::gettickcount();
+    temp.count = 1;
+    temp.hash = hash;
+    temp.lastUpdateTime = ::gettickcount();
 
-    if (MAX_RECORD_COUNT == iarr_record_.size()) {
+    if (MAX_RECORD_COUNT == mRecordList.size()) {
         unsigned int del_index = 0;
 
-        for (unsigned int i = 1; i < iarr_record_.size(); i++) {
-            if (iarr_record_[del_index].time_last_update_ > iarr_record_[i].time_last_update_) {
+        for (unsigned int i = 1; i < mRecordList.size(); i++) {
+            if (mRecordList[del_index].lastUpdateTime > mRecordList[i].lastUpdateTime) {
                 del_index = i;
             }
         }
 
-        std::vector<STAvalancheRecord>::iterator it = iarr_record_.begin();
+        std::vector<STAvalancheRecord>::iterator it = mRecordList.begin();
         it += del_index;
-        iarr_record_.erase(it);
+        mRecordList.erase(it);
     }
 
-    iarr_record_.push_back(temp);
+    mRecordList.push_back(temp);
 }
 
-void FrequencyLimit::__UpdateRecord(int _index) {
-    xassert2(0 <= _index && (unsigned int)_index < iarr_record_.size());
+void FrequencyLimit::__UpdateRecord(int index) {
+    xassert2(0 <= index && (unsigned int) index < mRecordList.size());
 
-    iarr_record_[_index].count_ += 1;
-    iarr_record_[_index].time_last_update_ = ::gettickcount();
+    mRecordList[index].count += 1;
+    mRecordList[index].lastUpdateTime = ::gettickcount();
 }
 
-unsigned int FrequencyLimit::__GetLastUpdateTillNow(int _index) {
-    xassert2(0 <= _index && (unsigned int)_index < iarr_record_.size());
+unsigned int FrequencyLimit::__GetLastUpdateTillNow(int index) {
+    xassert2(0 <= index && (unsigned int) index < mRecordList.size());
 
-    return (unsigned int)(::gettickcount() - iarr_record_[_index].time_last_update_);
+    return (unsigned int) (::gettickcount() - mRecordList[index].lastUpdateTime);
 }
 
-bool FrequencyLimit::__CheckRecord(int _index) const {
-    xassert2(0 <= _index && (unsigned int)_index < iarr_record_.size());
-    return (iarr_record_[_index].count_) <= RECORD_INTERCEPT_COUNT;
+bool FrequencyLimit::__CheckRecord(int index) const {
+    xassert2(0 <= index && (unsigned int) index < mRecordList.size());
+    return (mRecordList[index].count) <= RECORD_INTERCEPT_COUNT;
 }

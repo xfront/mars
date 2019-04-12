@@ -35,12 +35,12 @@ DEFINE_FIND_CLASS(KC2Java, "com/tencent/mars/stn/StnLogic")
 namespace mars {
 namespace stn {
 
-extern boost::signals2::signal<void (ErrCmdType _err_type, int _err_code, const std::string& _ip, uint16_t _port)> SignalOnLongLinkNetworkError;
-extern boost::signals2::signal<void (ErrCmdType _err_type, int _err_code, const std::string& _ip, const std::string& _host, uint16_t _port)> SignalOnShortLinkNetworkError;
+extern boost::signals2::signal<void (ErrCmdType errType, int errCode, const std::string& ip, uint16_t port)> SignalOnLongLinkNetworkError;
+extern boost::signals2::signal<void (ErrCmdType errType, int errCode, const std::string& ip, const std::string& host, uint16_t port)> SignalOnShortLinkNetworkError;
     
 DEFINE_FIND_STATIC_METHOD(KC2Java_onTaskEnd, KC2Java, "onTaskEnd", "(ILjava/lang/Object;II)I")
-int (*OnTaskEnd)(uint32_t _taskid, void* const _user_context, int _error_type, int _error_code)
-= [](uint32_t _taskid, void* const _user_context, int _error_type, int _error_code) {
+int (*OnTaskEnd)(uint32_t taskId, void* const userContext, int errorType, int errorCode)
+= [](uint32_t taskId, void* const userContext, int errorType, int errorCode) {
 
     xverbose_function();
 
@@ -49,14 +49,14 @@ int (*OnTaskEnd)(uint32_t _taskid, void* const _user_context, int _error_type, i
 	ScopeJEnv scope_jenv(cache_instance->GetJvm());
 	JNIEnv *env = scope_jenv.GetEnv();
 
-	int ret = (int)JNU_CallStaticMethodByMethodInfo(env, KC2Java_onTaskEnd, (jint)_taskid, _user_context, (jint)_error_type, (jint)_error_code).i;
+	int ret = (int)JNU_CallStaticMethodByMethodInfo(env, KC2Java_onTaskEnd, (jint)taskId, userContext, (jint)errorType, (jint)errorCode).i;
 
 	return ret;
 };
 
 DEFINE_FIND_STATIC_METHOD(KC2Java_onPush, KC2Java, "onPush", "(I[B)V")
-void (*OnPush)(uint64_t _channel_id, uint32_t _cmdid, uint32_t _taskid, const AutoBuffer& _body, const AutoBuffer& _extend)
-= [](uint64_t _channel_id, uint32_t _cmdid, uint32_t _taskid, const AutoBuffer& _body, const AutoBuffer& _extend) {
+void (*OnPush)(uint64_t channelId, uint32_t cmdId, uint32_t taskId, const AutoBuffer& body, const AutoBuffer& bufExt)
+= [](uint64_t channelId, uint32_t cmdId, uint32_t taskId, const AutoBuffer& body, const AutoBuffer& bufExt) {
 
     xverbose_function();
 
@@ -67,13 +67,13 @@ void (*OnPush)(uint64_t _channel_id, uint32_t _cmdid, uint32_t _taskid, const Au
 
 	jbyteArray data_jba = NULL;
 
-	if (_body.Length() > 0) {
-		data_jba = JNU_Buffer2JbyteArray(env, _body);
+	if (body.Length() > 0) {
+		data_jba = JNU_Buffer2JbyteArray(env, body);
 	} else {
 		xdebug2(TSF"the data.Lenght() < = 0");
 	}
 
-	JNU_CallStaticMethodByMethodInfo(env, KC2Java_onPush, (jint)_cmdid, data_jba);
+	JNU_CallStaticMethodByMethodInfo(env, KC2Java_onPush, (jint)cmdId, data_jba);
 
 	if (data_jba != NULL) {
 		JNU_FreeJbyteArray(env, data_jba);
@@ -82,8 +82,8 @@ void (*OnPush)(uint64_t _channel_id, uint32_t _cmdid, uint32_t _taskid, const Au
 };
 
 DEFINE_FIND_STATIC_METHOD(KC2Java_onNewDns, KC2Java, "onNewDns", "(Ljava/lang/String;)[Ljava/lang/String;")
-std::vector<std::string> (*OnNewDns)(const std::string& _host)
-= [](const std::string& _host) {
+std::vector<std::string> (*OnNewDns)(const std::string& host)
+= [](const std::string& host) {
 	xverbose_function();
 
 	VarCache* cache_instance = VarCache::Singleton();
@@ -91,8 +91,8 @@ std::vector<std::string> (*OnNewDns)(const std::string& _host)
 	JNIEnv *env = scope_jenv.GetEnv();
 	std::vector<std::string> iplist;
 
-	if (!_host.empty()) {
-		jobjectArray ip_strs = (jobjectArray)JNU_CallStaticMethodByMethodInfo(env, KC2Java_onNewDns, ScopedJstring(env, _host.c_str()).GetJstr()).l;
+	if (!host.empty()) {
+		jobjectArray ip_strs = (jobjectArray)JNU_CallStaticMethodByMethodInfo(env, KC2Java_onNewDns, ScopedJstring(env, host.c_str()).GetJstr()).l;
 		if (ip_strs != NULL) {
 			jsize size = env->GetArrayLength(ip_strs);
 			for (int i = 0; i < size; i++) {
@@ -113,8 +113,8 @@ std::vector<std::string> (*OnNewDns)(const std::string& _host)
 };
 
 DEFINE_FIND_STATIC_METHOD(KC2Java_req2Buf, KC2Java, "req2Buf", "(ILjava/lang/Object;Ljava/io/ByteArrayOutputStream;[II)Z")
-bool (*Req2Buf)(uint32_t _taskid,  void* const _user_context, AutoBuffer& _outbuffer,  AutoBuffer& _extend, int& _error_code, const int _channel_select)
-= [](uint32_t _taskid,  void* const _user_context, AutoBuffer& _outbuffer,  AutoBuffer& _extend, int& _error_code, const int _channel_select) -> bool {
+bool (*Req2Buf)(uint32_t taskId,  void* const userContext, AutoBuffer& _outbuffer,  AutoBuffer& bufExt, int& errorCode, const int channelSelect)
+= [](uint32_t taskId,  void* const userContext, AutoBuffer& _outbuffer,  AutoBuffer& bufExt, int& errorCode, const int channelSelect) -> bool {
 
     xverbose_function();
 
@@ -134,7 +134,7 @@ bool (*Req2Buf)(uint32_t _taskid,  void* const _user_context, AutoBuffer& _outbu
 
 	jintArray errcode_array = env->NewIntArray(2);
 
-	jboolean ret = JNU_CallStaticMethodByMethodInfo(env, KC2Java_req2Buf, (jint)_taskid, _user_context, byte_array_output_stream_obj, errcode_array, _channel_select).z;
+	jboolean ret = JNU_CallStaticMethodByMethodInfo(env, KC2Java_req2Buf, (jint)taskId, userContext, byte_array_output_stream_obj, errcode_array, channelSelect).z;
 
 	if (ret) {
 		jbyteArray ret_byte_array = (jbyteArray)JNU_CallMethodByName(env, byte_array_output_stream_obj, "toByteArray", "()[B").l;
@@ -151,7 +151,7 @@ bool (*Req2Buf)(uint32_t _taskid,  void* const _user_context, AutoBuffer& _outbu
 	env->DeleteLocalRef(byte_array_output_stream_obj);
 
 	jint* errcode = env->GetIntArrayElements(errcode_array, NULL);
-	_error_code = errcode[0];
+	errorCode = errcode[0];
 	env->ReleaseIntArrayElements(errcode_array, errcode, 0);
 	env->DeleteLocalRef(errcode_array);
 
@@ -159,8 +159,8 @@ bool (*Req2Buf)(uint32_t _taskid,  void* const _user_context, AutoBuffer& _outbu
 };
 
 DEFINE_FIND_STATIC_METHOD(KC2Java_buf2Resp, KC2Java, "buf2Resp", "(ILjava/lang/Object;[B[II)I")
-int (*Buf2Resp)(uint32_t _taskid, void* const _user_context, const AutoBuffer& _inbuffer, const AutoBuffer& _extend, int& _error_code, const int _channel_select)
-= [](uint32_t _taskid, void* const _user_context, const AutoBuffer& _inbuffer, const AutoBuffer& _extend, int& _error_code, const int _channel_select) {
+int (*Buf2Resp)(uint32_t taskId, void* const userContext, const AutoBuffer& _inbuffer, const AutoBuffer& bufExt, int& errorCode, const int channelSelect)
+= [](uint32_t taskId, void* const userContext, const AutoBuffer& _inbuffer, const AutoBuffer& bufExt, int& errorCode, const int channelSelect) {
 
     xverbose_function();
 
@@ -178,14 +178,14 @@ int (*Buf2Resp)(uint32_t _taskid, void* const _user_context, const AutoBuffer& _
 
 	jintArray errcode_array = env->NewIntArray(1);
 
-	jint ret = JNU_CallStaticMethodByMethodInfo(env, KC2Java_buf2Resp, (jint)_taskid, _user_context, resp_buf_jba, errcode_array, _channel_select).i;
+	jint ret = JNU_CallStaticMethodByMethodInfo(env, KC2Java_buf2Resp, (jint)taskId, userContext, resp_buf_jba, errcode_array, channelSelect).i;
 
 	if (resp_buf_jba != NULL) {
 		env->DeleteLocalRef(resp_buf_jba);
 	}
 
     jint* errcode = env->GetIntArrayElements(errcode_array, NULL);
-    _error_code = errcode[0];
+    errorCode = errcode[0];
     env->ReleaseIntArrayElements(errcode_array, errcode, 0);
     env->DeleteLocalRef(errcode_array);
 
@@ -207,8 +207,8 @@ bool (*MakesureAuthed)()
 };
 
 DEFINE_FIND_STATIC_METHOD(KC2Java_getLongLinkIdentifyCheckBuffer, KC2Java, "getLongLinkIdentifyCheckBuffer", "(Ljava/io/ByteArrayOutputStream;Ljava/io/ByteArrayOutputStream;[I)I")
-int (*GetLonglinkIdentifyCheckBuffer)(AutoBuffer& _identify_buffer, AutoBuffer& _buffer_hash, int32_t& _cmdid)
-= [](AutoBuffer& _identify_buffer, AutoBuffer& _buffer_hash, int32_t& _cmdid) {
+int (*GetLonglinkIdentifyCheckBuffer)(AutoBuffer& _identify_buffer, AutoBuffer& _buffer_hash, int32_t& cmdId)
+= [](AutoBuffer& _identify_buffer, AutoBuffer& _buffer_hash, int32_t& cmdId) {
     xverbose_function();
     
     VarCache* cache_instance = VarCache::Singleton();
@@ -246,7 +246,7 @@ int (*GetLonglinkIdentifyCheckBuffer)(AutoBuffer& _identify_buffer, AutoBuffer& 
     
     
     jint* jcmdids = env->GetIntArrayElements(jcmdid_array, NULL);
-    _cmdid = (int)jcmdids[0];
+    cmdId = (int)jcmdids[0];
     env->ReleaseIntArrayElements(jcmdid_array, jcmdids, 0);
     env->DeleteLocalRef(jcmdid_array);
 
@@ -340,7 +340,7 @@ void (*ReportConnectStatus)(int _all_connstatus, int _longlink_connstatus)
 };
 
 //DEFINE_FIND_STATIC_METHOD(KC2Java_reportCrashStatistics, KC2Java, "reportCrashStatistics", "(Ljava/lang/String;Ljava/lang/String;)V")
-void reportCrashStatistics(const char* _raw, const char* _type)
+void reportCrashStatistics(const char* _raw, const char* type)
 {
 }
 
@@ -357,8 +357,8 @@ void (*RequestSync)()
 };
 
 DEFINE_FIND_STATIC_METHOD(KC2Java_requestNetCheckShortLinkHosts, KC2Java, "requestNetCheckShortLinkHosts", "()[Ljava/lang/String;")
-void (*RequestNetCheckShortLinkHosts)(std::vector<std::string>& _hostlist)
-= [](std::vector<std::string>& _hostlist) {
+void (*RequestNetCheckShortLinkHosts)(std::vector<std::string>& hostList)
+= [](std::vector<std::string>& hostList) {
 	xverbose_function();
 
 	VarCache* cache_instance = VarCache::Singleton();
@@ -372,7 +372,7 @@ void (*RequestNetCheckShortLinkHosts)(std::vector<std::string>& _hostlist)
 		for (int i = 0; i < size; i++) {
 			jstring host = (jstring)env->GetObjectArrayElement(jobj_arr, i);
 			if (host != NULL) {
-				_hostlist.push_back(ScopedJstring(env, host).GetChar());
+				hostList.push_back(ScopedJstring(env, host).GetChar());
 			}
 			JNU_FreeJstring(env, host);
 		}
@@ -382,8 +382,8 @@ void (*RequestNetCheckShortLinkHosts)(std::vector<std::string>& _hostlist)
 };
 
 DEFINE_FIND_STATIC_METHOD(KC2Java_reportTaskProfile, KC2Java, "reportTaskProfile", "(Ljava/lang/String;)V")
-void (*ReportTaskProfile)(const TaskProfile& _task_profile)
-= [](const TaskProfile& _task_profile) {
+void (*ReportTaskProfile)(const TaskProfile& taskProfile)
+= [](const TaskProfile& taskProfile) {
 	xverbose_function();
 
 	VarCache* cache_instance = VarCache::Singleton();
@@ -392,36 +392,36 @@ void (*ReportTaskProfile)(const TaskProfile& _task_profile)
 
 	XMessage profile_json;
 	profile_json << "{";
-	profile_json << "\"taskId\":" << _task_profile.task.taskid;
-	profile_json << ",\"cmdId\":" << _task_profile.task.cmdid;
-	profile_json << ",\"cgi\":\"" << _task_profile.task.cgi << "\"";
-	profile_json << ",\"startTaskTime\":" << _task_profile.start_task_time;
-	profile_json << ",\"endTaskTime\":" << _task_profile.end_task_time;
-	profile_json << ",\"dyntimeStatus\":" << _task_profile.current_dyntime_status;
-	profile_json << ",\"errCode\":" << _task_profile.err_code;
-	profile_json << ",\"errType\":" << _task_profile.err_type;
-	profile_json << ",\"channelSelect\":" << _task_profile.link_type;
+	profile_json << "\"taskId\":" << taskProfile.task.taskId;
+	profile_json << ",\"cmdId\":" << taskProfile.task.cmdId;
+	profile_json << ",\"cgi\":\"" << taskProfile.task.cgi << "\"";
+	profile_json << ",\"startTaskTime\":" << taskProfile.startTaskTime;
+	profile_json << ",\"endTaskTime\":" << taskProfile.endTaskTime;
+	profile_json << ",\"dyntimeStatus\":" << taskProfile.currentDyntimeStatus;
+	profile_json << ",\"errCode\":" << taskProfile.errCode;
+	profile_json << ",\"errType\":" << taskProfile.errType;
+	profile_json << ",\"channelSelect\":" << taskProfile.linkType;
 	profile_json << ",\"historyNetLinkers\":[";
-	std::vector<TransferProfile>::const_iterator iter = _task_profile.history_transfer_profiles.begin();
-	for (; iter != _task_profile.history_transfer_profiles.end(); ) {
-		const ConnectProfile& connect_profile = iter->connect_profile;
+	std::vector<TransferProfile>::const_iterator iter = taskProfile.historyTransferProfiles.begin();
+	for (; iter != taskProfile.historyTransferProfiles.end(); ) {
+		const ConnectProfile& connect_profile = iter->connectProfile;
 		profile_json << "{";
-		profile_json << "\"startTime\":" << connect_profile.start_time;
-		profile_json << ",\"dnsTime\":" << connect_profile.dns_time;
-		profile_json << ",\"dnsEndTime\":" << connect_profile.dns_endtime;
-		profile_json << ",\"connTime\":" << connect_profile.conn_time;
-		profile_json << ",\"connErrCode\":" << connect_profile.conn_errcode;
-		profile_json << ",\"tryIPCount\":" << connect_profile.tryip_count;
+		profile_json << "\"startTime\":" << connect_profile.startTime;
+		profile_json << ",\"dnsTime\":" << connect_profile.dnsTime;
+		profile_json << ",\"dnsEndTime\":" << connect_profile.dnsEndtime;
+		profile_json << ",\"connTime\":" << connect_profile.connTime;
+		profile_json << ",\"connErrCode\":" << connect_profile.connErrcode;
+		profile_json << ",\"tryIPCount\":" << connect_profile.tryIpCount;
 		profile_json << ",\"ip\":\"" << connect_profile.ip << "\"";
 		profile_json << ",\"port\":" << connect_profile.port;
 		profile_json << ",\"host\":\"" << connect_profile.host << "\"";
-		profile_json << ",\"ipType\":" << connect_profile.ip_type;
-		profile_json << ",\"disconnTime\":" << connect_profile.disconn_time;
-		profile_json << ",\"disconnErrType\":" << connect_profile.disconn_errtype;
-		profile_json << ",\"disconnErrCode\":" << connect_profile.disconn_errcode;
+		profile_json << ",\"ipType\":" << connect_profile.ipType;
+		profile_json << ",\"disconnTime\":" << connect_profile.disconnTime;
+		profile_json << ",\"disconnErrType\":" << connect_profile.disconnErrType;
+		profile_json << ",\"disconnErrCode\":" << connect_profile.disconnErrCode;
 
 		profile_json << "}";
-		if (++iter != _task_profile.history_transfer_profiles.end()) {
+		if (++iter != taskProfile.historyTransferProfiles.end()) {
 			profile_json << ",";
 		}
 		else {
@@ -434,26 +434,26 @@ void (*ReportTaskProfile)(const TaskProfile& _task_profile)
 	JNU_CallStaticMethodByMethodInfo(env, KC2Java_reportTaskProfile, ScopedJstring(env, report_task_str.c_str()).GetJstr());
 };
 
-void (*ReportTaskLimited)(int _check_type, const Task& _task, unsigned int& _param)
-= [](int _check_type, const Task& _task, unsigned int& _param) {
+void (*ReportTaskLimited)(int checkType, const Task& task, unsigned int& param)
+= [](int checkType, const Task& task, unsigned int& param) {
 
 };
 
-void (*ReportDnsProfile)(const DnsProfile& _dns_profile)
-= [](const DnsProfile& _dns_profile) {
+void (*ReportDnsProfile)(const DnsProfile& dnsProfile)
+= [](const DnsProfile& dnsProfile) {
 };
 
-void (*OnLongLinkNetworkError)(ErrCmdType _err_type, int _err_code, const std::string& _ip, uint16_t _port)
-= [](ErrCmdType _err_type, int _err_code, const std::string& _ip, uint16_t _port) {
-    SignalOnLongLinkNetworkError(_err_type, _err_code, _ip, _port);
+void (*OnLongLinkNetworkError)(ErrCmdType errType, int errCode, const std::string& ip, uint16_t port)
+= [](ErrCmdType errType, int errCode, const std::string& ip, uint16_t port) {
+    SignalOnLongLinkNetworkError(errType, errCode, ip, port);
 };
     
-void (*OnShortLinkNetworkError)(ErrCmdType _err_type, int _err_code, const std::string& _ip, const std::string& _host, uint16_t _port)
-= [](ErrCmdType _err_type, int _err_code, const std::string& _ip, const std::string& _host, uint16_t _port) {
-    SignalOnShortLinkNetworkError(_err_type, _err_code, _ip, _host, _port);
+void (*OnShortLinkNetworkError)(ErrCmdType errType, int errCode, const std::string& ip, const std::string& host, uint16_t port)
+= [](ErrCmdType errType, int errCode, const std::string& ip, const std::string& host, uint16_t port) {
+    SignalOnShortLinkNetworkError(errType, errCode, ip, host, port);
 };
-void (*OnLongLinkStatusChange)(int _status)
-= [](int _status) {
+void (*OnLongLinkStatusChange)(int status)
+= [](int status) {
 
 };
 }

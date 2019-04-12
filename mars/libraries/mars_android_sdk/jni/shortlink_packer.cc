@@ -17,41 +17,49 @@
  *      Author: yanguoyue
  */
 
+#include "mars/comm/xlogger/xlogger.h"
 #include "shortlink_packer.h"
 #include "mars/comm/http.h"
 
 
 using namespace http;
-namespace mars { namespace stn {
+namespace mars {
+namespace stn {
 
-shortlink_tracker* (*shortlink_tracker::Create)()
+shortlink_tracker *(*shortlink_tracker::Create)()
 =  []() { return new shortlink_tracker; };
 
-void (*shortlink_pack)(const std::string& _url, const std::map<std::string, std::string>& _headers, const AutoBuffer& _body, const AutoBuffer& _extension, AutoBuffer& _out_buff, shortlink_tracker* _tracker)
-= [](const std::string& _url, const std::map<std::string, std::string>& _headers, const AutoBuffer& _body, const AutoBuffer& _extension, AutoBuffer& _out_buff, shortlink_tracker* _tracker) {
+void
+(*shortlink_pack)(const std::string &url, const std::map<std::string, std::string> &headers, const AutoBuffer &body,
+                  const AutoBuffer &bufExt, AutoBuffer &bufOut, shortlink_tracker *tracker)
+= [](const std::string &url, const std::map<std::string, std::string> &headers, const AutoBuffer &body,
+     const AutoBuffer &bufExt, AutoBuffer &bufOut, shortlink_tracker *tracker) {
 
-	Builder req_builder(kRequest);
-	req_builder.Request().Method(RequestLine::kPost);
-	req_builder.Request().Version(kVersion_1_1);
+    Builder req_builder(kRequest);
+    req_builder.Request().Method(body.Length()?RequestLine::kPost:RequestLine::kGet);
+    req_builder.Request().Version(kVersion_1_1);
 
-	req_builder.Fields().HeaderFiled(HeaderFields::MakeAcceptAll());
-	req_builder.Fields().HeaderFiled(HeaderFields::KStringUserAgent, HeaderFields::KStringMicroMessenger);
-	req_builder.Fields().HeaderFiled(HeaderFields::MakeCacheControlNoCache());
-	req_builder.Fields().HeaderFiled(HeaderFields::MakeContentTypeOctetStream());
-	req_builder.Fields().HeaderFiled(HeaderFields::MakeConnectionClose());
+    req_builder.Fields().HeaderFiled(HeaderFields::MakeAcceptAll());
+    req_builder.Fields().HeaderFiled(HeaderFields::KStringUserAgent, HeaderFields::KStringMicroMessenger);
+    req_builder.Fields().HeaderFiled(HeaderFields::MakeCacheControlNoCache());
+    req_builder.Fields().HeaderFiled(HeaderFields::MakeContentTypeOctetStream());
+    req_builder.Fields().HeaderFiled(HeaderFields::MakeConnectionClose());
 
     char len_str[32] = {0};
-	snprintf(len_str, sizeof(len_str), "%u", (unsigned int)_body.Length());
-	req_builder.Fields().HeaderFiled(HeaderFields::KStringContentLength, len_str);
+    snprintf(len_str, sizeof(len_str), "%u", (unsigned int) body.Length());
+    req_builder.Fields().HeaderFiled(HeaderFields::KStringContentLength, len_str);
 
-	for (std::map<std::string, std::string>::const_iterator iter = _headers.begin(); iter != _headers.end(); ++iter) {
-		req_builder.Fields().HeaderFiled(iter->first.c_str(), iter->second.c_str());
-	}
+    for (std::map<std::string, std::string>::const_iterator iter = headers.begin(); iter != headers.end(); ++iter) {
+        req_builder.Fields().HeaderFiled(iter->first.c_str(), iter->second.c_str());
+    }
 
-	req_builder.Request().Url(_url);
-	req_builder.HeaderToBuffer(_out_buff);
-	_out_buff.Write(_body.Ptr(), _body.Length());
+    req_builder.Request().Url(url);
+    req_builder.HeaderToBuffer(bufOut);
+    xinfo2(TSF "HttpReq:%s ", xdump(bufOut.Ptr(), bufOut.Length()));
+
+    bufOut.Write(body.Ptr(), body.Length());
 };
 
-}}
+}
+}
 

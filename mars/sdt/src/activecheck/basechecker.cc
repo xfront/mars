@@ -34,7 +34,7 @@ BaseChecker::~BaseChecker() {
     CancelDoCheck();
 }
 
-int BaseChecker::StartDoCheck(CheckRequestProfile& _check_request) {
+int BaseChecker::StartDoCheck(CheckRequestProfile &_check_request) {
     xinfo_function();
     // timeout and finish net checker.
     if (_check_request.total_timeout <= 0) {
@@ -52,6 +52,6 @@ int BaseChecker::CancelDoCheck() {
     return 1;
 }
 
-void BaseChecker::__DoCheck(CheckRequestProfile& _check_request) {
+void BaseChecker::__DoCheck(CheckRequestProfile &_check_request) {
     xverbose_function();
 }

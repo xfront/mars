@@ -1,16 +1,16 @@
 /*
-* Tencent is pleased to support the open source community by making Mars available.
-* Copyright (C) 2016 THL A29 Limited, a Tencent company. All rights reserved.
-*
-* Licensed under the MIT License (the "License"); you may not use this file except in 
-* compliance with the License. You may obtain a copy of the License at
-* http://opensource.org/licenses/MIT
-*
-* Unless required by applicable law or agreed to in writing, software distributed under the License is
-* distributed on an "AS IS" basis, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-* either express or implied. See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Tencent is pleased to support the open source community by making Mars available.
+ * Copyright (C) 2016 THL A29 Limited, a Tencent company. All rights reserved.
+ *
+ * Licensed under the MIT License (the "License"); you may not use this file except in
+ * compliance with the License. You may obtain a copy of the License at
+ * http://opensource.org/licenses/MIT
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is
+ * distributed on an "AS IS" basis, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+ * either express or implied. See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package com.tencent.mars.sample.chat;
 
@@ -47,14 +47,17 @@ public class ChatMsgViewAdapter extends BaseAdapter {
         inflater = LayoutInflater.from(context);
     }
 
+    @Override
     public int getCount() {
         return coll.size();
     }
 
+    @Override
     public Object getItem(int position) {
         return coll.get(position);
     }
 
+    @Override
     public long getItemId(int position) {
         return position;
     }
@@ -62,6 +65,7 @@ public class ChatMsgViewAdapter extends BaseAdapter {
     /**
      * 得到Item的类型，是对方发过来的消息，还是自己发送出去的.
      */
+    @Override
     public int getItemViewType(int position) {
         ChatMsgEntity entity = coll.get(position);
 
@@ -76,10 +80,12 @@ public class ChatMsgViewAdapter extends BaseAdapter {
     /**
      * Item类型的总数.
      */
+    @Override
     public int getViewTypeCount() {
         return ITEMCOUNT;
     }
 
+    @Override
     public View getView(int position, View convertView, ViewGroup parent) {
 
         ChatMsgEntity entity = coll.get(position);
@@ -96,11 +102,11 @@ public class ChatMsgViewAdapter extends BaseAdapter {
 
             viewHolder = new ViewHolder();
             viewHolder.tvSendTime = (TextView) convertView
-                .findViewById(R.id.tv_sendtime);
+                    .findViewById(R.id.tv_sendtime);
             viewHolder.tvUserName = (TextView) convertView
-                .findViewById(R.id.tv_username);
+                    .findViewById(R.id.tv_username);
             viewHolder.tvContent = (TextView) convertView
-                .findViewById(R.id.tv_chatcontent);
+                    .findViewById(R.id.tv_chatcontent);
             viewHolder.isComMsg = isComMsg;
 
             convertView.setTag(viewHolder);

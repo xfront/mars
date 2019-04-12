@@ -29,7 +29,7 @@ typedef pthread_t thread_tid;
 // 如果在pthread_join途中，其他线程进行pthread_detach, 会出现join函数不能退出的情况
 
 class ThreadUtil {
-  public:
+public:
     static void yield() {
         ::sched_yield();
     }
@@ -46,7 +46,7 @@ class ThreadUtil {
         return pthread_self();
     }
 
-    static bool isruning(thread_tid _id) {
+    static bool isRunning(thread_tid _id) {
         ASSERT(0 != _id);
         int ret = pthread_kill(_id, 0);
 
@@ -59,7 +59,7 @@ class ThreadUtil {
 
         return false;
     }
-    
+
     static int join(thread_tid _id) {
         if (_id == ThreadUtil::currentthreadid()) return EDEADLK;
         int ret = pthread_join(_id, 0);
@@ -69,13 +69,13 @@ class ThreadUtil {
 };
 
 class Thread {
-  private:
+private:
     class RunnableReference {
-      public:
-        RunnableReference(Runnable* _target)
-            : target(_target), count(0), tid(0), isjoined(false), isended(true)
-            , aftertime(LONG_MAX), periodictime(LONG_MAX), iscanceldelaystart(false)
-            , condtime(), splock(), isinthread(false), killsig(0) {
+    public:
+        RunnableReference(Runnable *_target)
+                : target(_target), count(0), tid(0), isjoined(false), isended(true), aftertime(LONG_MAX),
+                  periodictime(LONG_MAX), iscanceldelaystart(false), condtime(), splock(), isinthread(false),
+                  killsig(0) {
             memset(thread_name, 0, sizeof(thread_name));
         }
 
@@ -85,8 +85,9 @@ class Thread {
             ASSERT(isended);
         }
 
-        void AddRef() { count++;}
-        void RemoveRef(ScopedSpinLock& _lock) {
+        void AddRef() { count++; }
+
+        void RemoveRef(ScopedSpinLock &_lock) {
             ASSERT(0 < count);
             ASSERT(_lock.islocked());
 
@@ -100,12 +101,13 @@ class Thread {
             if (willdel) delete this;
         }
 
-      private:
-        RunnableReference(const RunnableReference&);
-        RunnableReference& operator=(const RunnableReference&);
+    private:
+        RunnableReference(const RunnableReference &);
 
-      public:
-        Runnable* target;
+        RunnableReference &operator=(const RunnableReference &);
+
+    public:
+        Runnable *target;
         int count;
         thread_tid tid;
         bool isjoined;
@@ -120,10 +122,10 @@ class Thread {
         char thread_name[128];
     };
 
-  public:
+public:
     template<class T>
-    explicit Thread(const T& op, const char* _thread_name = NULL, bool _outside_join = false)
-        : runable_ref_(NULL), outside_join_(_outside_join) {
+    explicit Thread(const T &op, const char *_thread_name = NULL, bool _outside_join = false)
+            : runable_ref_(NULL), outside_join_(_outside_join) {
         runable_ref_ = new RunnableReference(detail::transform(op));
         ScopedSpinLock lock(runable_ref_->splock);
         runable_ref_->AddRef();
@@ -133,8 +135,8 @@ class Thread {
         if (_thread_name) strncpy(runable_ref_->thread_name, _thread_name, sizeof(runable_ref_->thread_name));
     }
 
-    Thread(const char* _thread_name = NULL, bool _outside_join = false)
-        : runable_ref_(NULL), outside_join_(_outside_join) {
+    Thread(const char *_thread_name = NULL, bool _outside_join = false)
+            : runable_ref_(NULL), outside_join_(_outside_join) {
         runable_ref_ = new RunnableReference(NULL);
         ScopedSpinLock lock(runable_ref_->splock);
         runable_ref_->AddRef();
@@ -152,12 +154,12 @@ class Thread {
         runable_ref_->RemoveRef(lock);
     }
 
-    int start(bool* _newone = NULL) {
+    int start(bool *_newone = NULL) {
         ScopedSpinLock lock(runable_ref_->splock);
 
         if (_newone) *_newone = false;
 
-        if (isruning())return 0;
+        if (isRunning())return 0;
         if (0 != runable_ref_->tid && !runable_ref_->isjoined) pthread_detach(runable_ref_->tid);
 
         ASSERT(runable_ref_->target);
@@ -165,7 +167,8 @@ class Thread {
         runable_ref_->isjoined = outside_join_;
         runable_ref_->AddRef();
 
-        int ret =  pthread_create(reinterpret_cast<thread_tid*>(&runable_ref_->tid), &attr_, start_routine, runable_ref_);
+        int ret = pthread_create(reinterpret_cast<thread_tid *>(&runable_ref_->tid), &attr_, startRoutine,
+                                 runable_ref_);
         ASSERT(0 == ret);
 
         if (_newone) *_newone = true;
@@ -178,15 +181,15 @@ class Thread {
         return ret;
     }
 
-    template <typename T>
-    int start(const T& op, bool* _newone = NULL) {
+    template<typename T>
+    int start(const T &op, bool *_newone = NULL) {
         ScopedSpinLock lock(runable_ref_->splock);
 
         if (_newone) *_newone = false;
 
-        if (isruning())return 0;
+        if (isRunning())return 0;
         if (0 != runable_ref_->tid && !runable_ref_->isjoined) pthread_detach(runable_ref_->tid);
-        
+
         delete runable_ref_->target;
         runable_ref_->target = detail::transform(op);
 
@@ -194,7 +197,8 @@ class Thread {
         runable_ref_->isjoined = outside_join_;
         runable_ref_->AddRef();
 
-        int ret =  pthread_create(reinterpret_cast<thread_tid*>(&runable_ref_->tid), &attr_, start_routine, runable_ref_);
+        int ret = pthread_create(reinterpret_cast<thread_tid *>(&runable_ref_->tid), &attr_, startRoutine,
+                                 runable_ref_);
         ASSERT(0 == ret);
 
         if (_newone) *_newone = true;
@@ -207,10 +211,10 @@ class Thread {
         return ret;
     }
 
-    int start_after(long after) {
+    int startAfter(long after) {
         ScopedSpinLock lock(runable_ref_->splock);
 
-        if (isruning())return 0;
+        if (isRunning())return 0;
         if (0 != runable_ref_->tid && !runable_ref_->isjoined) pthread_detach(runable_ref_->tid);
 
         ASSERT(runable_ref_->target);
@@ -221,7 +225,8 @@ class Thread {
         runable_ref_->iscanceldelaystart = false;
         runable_ref_->AddRef();
 
-        int ret =  pthread_create(reinterpret_cast<thread_tid*>(&runable_ref_->tid), &attr_, start_routine_after, runable_ref_);
+        int ret = pthread_create(reinterpret_cast<thread_tid *>(&runable_ref_->tid), &attr_, startRoutineAfter,
+                                 runable_ref_);
         ASSERT(0 == ret);
 
         if (0 != ret) {
@@ -233,19 +238,19 @@ class Thread {
         return ret;
     }
 
-    void cancel_after() {
+    void cancelAfter() {
         ScopedSpinLock lock(runable_ref_->splock);
 
-        if (!isruning()) return;
+        if (!isRunning()) return;
 
         runable_ref_->iscanceldelaystart = true;
         runable_ref_->condtime.notifyAll(true);
     }
 
-    int start_periodic(long after, long periodic) { // ms
+    int startPeriodic(long after, long periodic) { // ms
         ScopedSpinLock lock(runable_ref_->splock);
 
-        if (isruning()) return 0;
+        if (isRunning()) return 0;
         if (0 != runable_ref_->tid && !runable_ref_->isjoined) pthread_detach(runable_ref_->tid);
 
         ASSERT(runable_ref_->target);
@@ -257,7 +262,8 @@ class Thread {
         runable_ref_->periodictime = periodic;
         runable_ref_->AddRef();
 
-        int ret = pthread_create(reinterpret_cast<thread_tid*>(&runable_ref_->tid), &attr_, start_routine_periodic, runable_ref_);
+        int ret = pthread_create(reinterpret_cast<thread_tid *>(&runable_ref_->tid), &attr_, startRoutinePeriodic,
+                                 runable_ref_);
         ASSERT(0 == ret);
 
         if (0 != ret) {
@@ -270,10 +276,10 @@ class Thread {
         return ret;
     }
 
-    void cancel_periodic() {
+    void cancelPeriodic() {
         ScopedSpinLock lock(runable_ref_->splock);
 
-        if (!isruning()) return;
+        if (!isRunning()) return;
 
         runable_ref_->iscanceldelaystart = true;
         runable_ref_->condtime.notifyAll(true);
@@ -287,7 +293,7 @@ class Thread {
 
         if (tid() == ThreadUtil::currentthreadid()) return EDEADLK;
 
-        if (isruning()) {
+        if (isRunning()) {
             runable_ref_->isjoined = true;
             lock.unlock();
             ret = pthread_join(tid(), 0);
@@ -296,11 +302,11 @@ class Thread {
 
         return ret;
     }
-    
+
     int kill(int sig) const {
         ScopedSpinLock lock(runable_ref_->splock);
 
-        if (!isruning()) return ESRCH;
+        if (!isRunning()) return ESRCH;
 
         if (!runable_ref_->isinthread) {
             runable_ref_->killsig = sig;
@@ -313,13 +319,13 @@ class Thread {
         return ret;
     }
 
-    int unsafe_exit() const {
+    int unsafeExit() const {
 #ifdef ANDROID
         struct sigaction actions;
         memset(&actions, 0, sizeof(actions));
         sigemptyset(&actions.sa_mask);
         actions.sa_flags = 0;
-        actions.sa_handler = &exit_handler;
+        actions.sa_handler = &exitHandler;
         sigaction(SIGUSR2, &actions, NULL);
         ASSERT2(false, "In Android, use SIGUSR2(handler call pthread_exit) to pthread_cancel");
         return kill(SIGUSR2);
@@ -332,55 +338,57 @@ class Thread {
         return runable_ref_->tid;
     }
 
-    bool isruning() const {
+    bool isRunning() const {
         return !runable_ref_->isended;
     }
 
-    void stack_size(size_t _stacksize) {
+    void stackSize(size_t _stacksize) {
         if (_stacksize == 0) return;
 
         int res = pthread_attr_setstacksize(&attr_, _stacksize);
         ASSERT2(0 == res, "res=%d", res);
     }
 
-    size_t stack_size() const {
+    size_t stackSize() const {
         size_t _stacksize = 0;
         int res = pthread_attr_getstacksize(&attr_, &_stacksize);
         ASSERT2(0 == res, "res=%d", res);
         return _stacksize;
     }
-    
-    const char* thread_name() const {
+
+    const char *threadName() const {
         return runable_ref_->thread_name;
     }
 
-  private:
+private:
 
 #ifdef ANDROID
-    static void exit_handler(int _sig) {
+
+    static void exitHandler(int _sig) {
         pthread_exit(0);
     }
+
 #endif
 
-    static void init(void* arg) {
-        volatile RunnableReference* runableref = static_cast<RunnableReference*>(arg);
-        ScopedSpinLock lock((const_cast<RunnableReference*>(runableref))->splock);
+    static void init(void *arg) {
+        volatile RunnableReference *runableref = static_cast<RunnableReference *>(arg);
+        ScopedSpinLock lock((const_cast<RunnableReference *>(runableref))->splock);
         ASSERT(runableref != 0);
         ASSERT(runableref->target != 0);
         ASSERT(!runableref->isinthread);
 
         runableref->isinthread = true;
 
-        if (0 < strnlen((const char*)runableref->thread_name, sizeof(runableref->thread_name))) {
+        if (0 < strnlen((const char *) runableref->thread_name, sizeof(runableref->thread_name))) {
 #ifdef __APPLE__
             pthread_setname_np((const char*)runableref->thread_name);
 #elif defined(ANDROID)
-            pthread_setname_np(runableref->tid, (const char*)runableref->thread_name);
+            pthread_setname_np(runableref->tid, (const char *) runableref->thread_name);
 #else
-            
+
 #endif
         }
-        
+
         if (!(0 < runableref->killsig && runableref->killsig <= 32))
             return;
 
@@ -388,9 +396,9 @@ class Thread {
         pthread_kill(pthread_self(), runableref->killsig);
     }
 
-    static void cleanup(void* arg) {
-        volatile RunnableReference* runableref = static_cast<RunnableReference*>(arg);
-        ScopedSpinLock lock((const_cast<RunnableReference*>(runableref))->splock);
+    static void cleanup(void *arg) {
+        volatile RunnableReference *runableref = static_cast<RunnableReference *>(arg);
+        ScopedSpinLock lock((const_cast<RunnableReference *>(runableref))->splock);
 
         ASSERT(runableref != 0);
         ASSERT(runableref->target != 0);
@@ -400,71 +408,72 @@ class Thread {
         runableref->isinthread = false;
         runableref->killsig = 0;
         runableref->isended = true;
-        
-        (const_cast<RunnableReference*>(runableref))->RemoveRef(lock);
+
+        (const_cast<RunnableReference *>(runableref))->RemoveRef(lock);
     }
 
-    static void* start_routine(void* arg) {
+    static void *startRoutine(void *arg) {
         init(arg);
-        volatile RunnableReference* runableref = static_cast<RunnableReference*>(arg);
+        volatile RunnableReference *runableref = static_cast<RunnableReference *>(arg);
         pthread_cleanup_push(&cleanup, arg);
-        runableref->target->run();
-        pthread_cleanup_pop(1);
+            runableref->target->run();
+                pthread_cleanup_pop(1);
         return 0;
     }
 
-    static void* start_routine_after(void* arg) {
+    static void *startRoutineAfter(void *arg) {
         init(arg);
-        volatile RunnableReference* runableref = static_cast<RunnableReference*>(arg);
+        volatile RunnableReference *runableref = static_cast<RunnableReference *>(arg);
         pthread_cleanup_push(&cleanup, arg);
 
-        if (!runableref->iscanceldelaystart) {
-            (const_cast<RunnableReference*>(runableref))->condtime.wait(runableref->aftertime);
-
-            if (!runableref->iscanceldelaystart)
-                runableref->target->run();
-        }
-
-        pthread_cleanup_pop(1);
-        return 0;
-    }
-
-    static void* start_routine_periodic(void* arg) {
-        init(arg);
-        volatile RunnableReference* runableref = static_cast<RunnableReference*>(arg);
-        pthread_cleanup_push(&cleanup, arg);
-
-        if (!runableref->iscanceldelaystart) {
-            (const_cast<RunnableReference*>(runableref))->condtime.wait(runableref->aftertime);
-
-            while (!runableref->iscanceldelaystart) {
-                runableref->target->run();
+            if (!runableref->iscanceldelaystart) {
+                (const_cast<RunnableReference *>(runableref))->condtime.wait(runableref->aftertime);
 
                 if (!runableref->iscanceldelaystart)
-                    (const_cast<RunnableReference*>(runableref))->condtime.wait(runableref->periodictime);
+                    runableref->target->run();
             }
-        }
 
-        pthread_cleanup_pop(1);
+                pthread_cleanup_pop(1);
         return 0;
     }
 
-  private:
-    Thread(const Thread&);
-    Thread& operator=(const Thread&);
+    static void *startRoutinePeriodic(void *arg) {
+        init(arg);
+        volatile RunnableReference *runableref = static_cast<RunnableReference *>(arg);
+        pthread_cleanup_push(&cleanup, arg);
 
-  private:
-    RunnableReference*  runable_ref_;
+            if (!runableref->iscanceldelaystart) {
+                (const_cast<RunnableReference *>(runableref))->condtime.wait(runableref->aftertime);
+
+                while (!runableref->iscanceldelaystart) {
+                    runableref->target->run();
+
+                    if (!runableref->iscanceldelaystart)
+                        (const_cast<RunnableReference *>(runableref))->condtime.wait(runableref->periodictime);
+                }
+            }
+
+                pthread_cleanup_pop(1);
+        return 0;
+    }
+
+private:
+    Thread(const Thread &);
+
+    Thread &operator=(const Thread &);
+
+private:
+    RunnableReference *runable_ref_;
     pthread_attr_t attr_;
     bool outside_join_;
 };
 
 
-inline bool operator==(const Thread& lhs, const Thread& rhs) {
+inline bool operator==(const Thread &lhs, const Thread &rhs) {
     return pthread_equal(lhs.tid(), rhs.tid()) != 0;
 }
 
-inline bool operator!=(const Thread& lhs, const Thread& rhs) {
+inline bool operator!=(const Thread &lhs, const Thread &rhs) {
     return pthread_equal(lhs.tid(), rhs.tid()) == 0;
 }
 

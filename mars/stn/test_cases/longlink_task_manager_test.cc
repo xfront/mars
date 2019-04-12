@@ -36,9 +36,9 @@ static unsigned long  __ReadWriteTimeout(unsigned long  _first_pkg_timeout)
 	return  _first_pkg_timeout + 1000*kMaxRecvLen/rate;
 }
 
-static unsigned long  __FirstPkgTimeout(unsigned long  _init_first_pkg_timeout, unsigned int _sendlen, int _send_count)
+static unsigned long  __FirstPkgTimeout(unsigned long  initFirstPkgTimeout, unsigned int sendLen, int sendCount)
 {
-	xassert2(3600*1000 >= _init_first_pkg_timeout);
+	xassert2(3600*1000 >= initFirstPkgTimeout);
 
 	unsigned int rate = (kMobile != getNetInfo())?kWifiMinRate:kGPRSMinRate;
 	unsigned int base_rw_timeout = (kMobile != getNetInfo())?kBaseFirstPackageWifiTimeout:kBaseFirstPackageGPRSTimeout;
@@ -48,22 +48,22 @@ static unsigned long  __FirstPkgTimeout(unsigned long  _init_first_pkg_timeout, 
 
 	unsigned long ret = 0;
 
-	if (0<_init_first_pkg_timeout)
+	if (0<initFirstPkgTimeout)
 	{
-		ret = _init_first_pkg_timeout;
+		ret = initFirstPkgTimeout;
 	}
 	else
 	{
-		ret = 	base_rw_timeout + 1000*_sendlen/rate;
+		ret = 	base_rw_timeout + 1000*sendLen/rate;
 		ret = ret < max_rw_timeout? ret: max_rw_timeout;
 	}
 
-	ret += _send_count*task_delay;
+	ret += sendCount*task_delay;
 	return ret;
 }
 
 
-static void OnLongLinkNetworkError(int _line, ErrCmdType _eErrType, int _nErrCode, const std::string& _ip, unsigned int _port)
+static void OnLongLinkNetworkError(int _line, ErrCmdType _eErrType, int _nErrCode, const std::string& ip, unsigned int port)
 {
 
 }
@@ -76,10 +76,10 @@ static bool Check(const CNetCmd& acmd, const void* apBuffer, int anLen)
 static Condition sg_Condition;
 
 unsigned int sg_taskCostTime = 0;
-static int CallBack(int _from, ErrCmdType _eErrType, int _nErrCode, const AutoBuffer& _cookies, int _nHashCode, const CNetCmd& _cmd, unsigned int _taskcosttime)
+static int CallBack(int _from, ErrCmdType _eErrType, int _nErrCode, const AutoBuffer& _cookies, int _nHashCode, const CNetCmd& _cmd, unsigned int taskCostTime)
 {
-	printf("form:%d, errType:%d errCode:%d hashCode:%d, costTime:%u\n", _from, _eErrType, _nErrCode, _nHashCode, _taskcosttime);
-	sg_taskCostTime = _taskcosttime;
+	printf("form:%d, errType:%d errCode:%d hashCode:%d, costTime:%u\n", _from, _eErrType, _nErrCode, _nHashCode, taskCostTime);
+	sg_taskCostTime = taskCostTime;
 	
 	sg_Condition.notifyOne();
 	return 0;
@@ -102,30 +102,30 @@ static void initLongLinkTaskManager (CMMLongLinkTaskManager& _longLinkTaskManage
 class CDetour /* add ": public CMember" to enable access to member variables... */
 {
 public:
-	bool Mine_SingleRespHandle(std::list<STCmdLongLinkTask>::iterator _it, ErrCmdType _eErrType,
+	bool Mine_SingleRespHandle(std::list<STCmdLongLinkTask>::iterator it, ErrCmdType _eErrType,
 		int _nErrCode, const AutoBuffer& _cookies, unsigned int _respLength, const LongLinkConnectionInfo& info);
 
 
 
-	static bool (CDetour::* Real_SingleRespHandle)(std::list<STCmdLongLinkTask>::iterator _it, ErrCmdType _eErrType,
+	static bool (CDetour::* Real_SingleRespHandle)(std::list<STCmdLongLinkTask>::iterator it, ErrCmdType _eErrType,
 		int _nErrCode, const AutoBuffer& _cookies, unsigned int _respLength, const LongLinkConnectionInfo& info);
 
 
 };
 
-bool CDetour::Mine_SingleRespHandle(std::list<STCmdLongLinkTask>::iterator _it, ErrCmdType _eErrType,
+bool CDetour::Mine_SingleRespHandle(std::list<STCmdLongLinkTask>::iterator it, ErrCmdType _eErrType,
 									int _nErrCode, const AutoBuffer& _cookies, unsigned int _respLength, const LongLinkConnectionInfo& info)
 {
 	//printf("%s, %d \n", __FUNCTION__, __LINE__);
 	sg_Condition.notifyOne();
-	return (this->*Real_SingleRespHandle)(_it, _eErrType, _nErrCode, _cookies, _respLength, info);
+	return (this->*Real_SingleRespHandle)(it, _eErrType, _nErrCode, _cookies, _respLength, info);
 }
 
-bool (CDetour::* CDetour::Real_SingleRespHandle)(std::list<STCmdLongLinkTask>::iterator _it, ErrCmdType _eErrType,
-												 int _nErrCode, const AutoBuffer& _cookies, unsigned int _respLength, const LongLinkConnectionInfo& info) = (bool (CDetour::*)(std::list<STCmdLongLinkTask>::iterator _it, ErrCmdType _eErrType,
+bool (CDetour::* CDetour::Real_SingleRespHandle)(std::list<STCmdLongLinkTask>::iterator it, ErrCmdType _eErrType,
+												 int _nErrCode, const AutoBuffer& _cookies, unsigned int _respLength, const LongLinkConnectionInfo& info) = (bool (CDetour::*)(std::list<STCmdLongLinkTask>::iterator it, ErrCmdType _eErrType,
 												 int _nErrCode, const AutoBuffer& _cookies, unsigned int _respLength, const LongLinkConnectionInfo& info)) &CMMLongLinkTaskManager::__SingleRespHandle;
 
-static bool (CDetour::* Mine_Target1)(std::list<STCmdLongLinkTask>::iterator _it, ErrCmdType _eErrType, 
+static bool (CDetour::* Mine_Target1)(std::list<STCmdLongLinkTask>::iterator it, ErrCmdType _eErrType,
 									  int _nErrCode, const AutoBuffer& _cookies, unsigned int _respLength, const LongLinkConnectionInfo& info) = &CDetour::Mine_SingleRespHandle;
 
 static void HookSingleRespHandle()

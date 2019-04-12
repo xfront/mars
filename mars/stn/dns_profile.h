@@ -39,31 +39,31 @@ struct DnsProfile {
 	}
 
 	void Reset() {
-		start_time = gettickcount();
-		end_time = 0;
+		startTime = gettickcount();
+		endTime = 0;
 
 		host.clear();
 
-		err_type = 0;
-		err_code = 0;
+		errType = 0;
+		errCode = 0;
 
-		dnstype = kType_NewDns;
+		dnsType = kType_NewDns;
 	}
 
 	void OnFailed() {
-		err_type = kEctLocal;
-		err_code = -1;
+		errType = kEctLocal;
+		errCode = -1;
 	}
 
-	uint64_t start_time;
-	uint64_t end_time;
+	uint64_t startTime;
+	uint64_t endTime;
 
 	std::string host;
 
-	int err_type;
-	int err_code;
+	int errType;
+	int errCode;
 
-	int dnstype;
+	int dnsType;
 
 };
 

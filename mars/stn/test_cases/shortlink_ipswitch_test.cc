@@ -196,7 +196,7 @@ static bool sg_isAlreadyConnHardcodeIp = false;
 
 
 //-----------------------------begin hook----------------------------------------------
-//---step1  Declare hook function  (unsigned int& port, std::string& strProxy, std::string& _host)
+//---step1  Declare hook function  (unsigned int& port, std::string& strProxy, std::string& host)
 DECLARE_HOOK_BEGIN
 	DECLARE_HOOK_FUNCTION3(CMMNetSource, GetShortLinkProxyInfo, bool, unsigned int&, std::string&, std::string&);
 	DECLARE_HOOK_FUNCTION2(CMMNetSource, GetShortLinkIPs, bool, const std::vector<std::string>&, std::vector<IPPortItem>&);
@@ -225,25 +225,25 @@ DETACH_HOOK_END
 
 	///------step4 Implement the hook function for the real function
 
-IMPLEMENT_MINE_HOOK_FUNCITON3(CMMNetSource, GetShortLinkProxyInfo, bool, unsigned int&, port, std::string&, strProxy, std::string&, _host)
+IMPLEMENT_MINE_HOOK_FUNCITON3(CMMNetSource, GetShortLinkProxyInfo, bool, unsigned int&, port, std::string&, strProxy, std::string&, host)
 {
-	(this->*Real_GetShortLinkProxyInfo)(port, strProxy, _host);
+	(this->*Real_GetShortLinkProxyInfo)(port, strProxy, host);
 	return false;
 }
 
-IMPLEMENT_MINE_HOOK_FUNCITON3(CMMNetSource, ReportShortIP, void, bool, _isSuccess, const std::string&, _ip, const std::string&, _host)
+IMPLEMENT_MINE_HOOK_FUNCITON3(CMMNetSource, ReportShortIP, void, bool, isSuccess, const std::string&, ip, const std::string&, host)
 {
-	(this->*Real_ReportShortIP)(_isSuccess, _ip, _host);
-	printf("******connect %s: ip=%s, host=%s************************\n", _isSuccess?"success":"failed", _ip.c_str(), _host.c_str());
+	(this->*Real_ReportShortIP)(isSuccess, ip, host);
+	printf("******connect %s: ip=%s, host=%s************************\n", isSuccess?"success":"failed", ip.c_str(), host.c_str());
 }
 
-IMPLEMENT_MINE_HOOK_FUNCITON2(CMMNetSource, GetShortLinkIPs, bool, const std::vector<std::string>&, _hostlist, std::vector<IPPortItem>&, _IPPortItems)
+IMPLEMENT_MINE_HOOK_FUNCITON2(CMMNetSource, GetShortLinkIPs, bool, const std::vector<std::string>&, hostList, std::vector<IPPortItem>&, _IPPortItems)
 {
 	if(1==sg_TestType)
 	{
 		banAllNewdnsIP();
 	}
-	(this->*Real_GetShortLinkIPs)(_hostlist, _IPPortItems);
+	(this->*Real_GetShortLinkIPs)(hostList, _IPPortItems);
 	PRINT_IPPORTITEMS(_IPPortItems);
 	std::vector<IPPortItem>::iterator iter=_IPPortItems.begin();
 	for (; iter!=_IPPortItems.end(); ++iter)
@@ -342,9 +342,9 @@ static void UnHookPrivate()
 
 
 //----------------------------begin callback change------------------------
-static int CallBack(int _from, ErrCmdType _eErrType, int _nErrCode, const AutoBuffer& _cookies, int _nHashCode, const CNetCmd& _cmd, unsigned int _taskcosttime)
+static int CallBack(int _from, ErrCmdType _eErrType, int _nErrCode, const AutoBuffer& _cookies, int _nHashCode, const CNetCmd& _cmd, unsigned int taskCostTime)
 {
-	printf("from:%d, errType:%d errCode:%d hashCode:%d, costTime:%u\n", _from, _eErrType, _nErrCode, _nHashCode, _taskcosttime);
+	printf("from:%d, errType:%d errCode:%d hashCode:%d, costTime:%u\n", _from, _eErrType, _nErrCode, _nHashCode, taskCostTime);
 
 	//sg_Condition.notifyOne();
 
@@ -379,13 +379,13 @@ static void ChangeBindFunc(CMMNetCore* _netcore)
 #define CHINESE_WORDING_SECTION "Shortlink Chinese Wording"
 #define ENGLISH_WORDING_SECTION "Shortlink English Wording"
 
-static std::string get_english_wording_from_ini(const char* _key)
+static std::string get_english_wording_from_ini(const char* key)
 {
-	return UtilFunc::get_wording_from_ini(_key,ENGLISH_WORDING_SECTION, INI_FILE);
+	return UtilFunc::get_wording_from_ini(key,ENGLISH_WORDING_SECTION, INI_FILE);
 }
-static std::string get_chinese_wording_from_ini(const char* _key)
+static std::string get_chinese_wording_from_ini(const char* key)
 {
-	return UtilFunc::get_wording_from_ini(_key,CHINESE_WORDING_SECTION, INI_FILE);
+	return UtilFunc::get_wording_from_ini(key,CHINESE_WORDING_SECTION, INI_FILE);
 }
 #define USE_CHINESE_WORDING
 #ifdef USE_CHINESE_WORDING
@@ -527,11 +527,11 @@ static void shortIpSwitchTest(TestCaseInfo *m_testCaseInfo, const IpSwitchParam&
 
 
 
-static bool startNewdnsMockServer(const char* _ip, unsigned int _port)
+static bool startNewdnsMockServer(const char* ip, unsigned int port)
 {
 	_chdir(NETSOURCE_CHDIR_DIR);
 	char tmpCmd[1024] = {0};
-	snprintf(tmpCmd, sizeof(tmpCmd), START_NEWDNS_SERVER_CMD, _ip, _port);
+	snprintf(tmpCmd, sizeof(tmpCmd), START_NEWDNS_SERVER_CMD, ip, port);
 	printf("line:%d,tempCmd=%s\n",__LINE__, tmpCmd);
 	FILE* f = _popen(tmpCmd , "rt");
 	if(NULL == f)   

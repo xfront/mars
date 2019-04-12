@@ -42,7 +42,7 @@
 
 using namespace mars::stn;
 
-static const char* const kItemDelimiter = ":";
+static const char *const kItemDelimiter = ":";
 
 static const int kNumMakeCount = 5;
 
@@ -53,33 +53,31 @@ static std::string sg_longlink_debugip;
 
 static int sg_shortlink_port;
 static std::string sg_shortlink_debugip;
-static std::map< std::string, std::vector<std::string> > sg_host_backupips_mapping;
+static std::map<std::string, std::vector<std::string> > sg_host_backupips_mapping;
 static std::vector<uint16_t> sg_lowpriority_longlink_ports;
 
-static std::map< std::string, std::string > sg_host_debugip_mapping;
+static std::map<std::string, std::string> sg_host_debugip_mapping;
 
 static Mutex sg_ip_mutex;
 
-NetSource::DnsUtil::DnsUtil():
-new_dns_(OnNewDns) {
+NetSource::DnsUtil::DnsUtil() :
+        mNewDns(OnNewDns) {
 }
 
 NetSource::DnsUtil::~DnsUtil() {}
 
-void NetSource::DnsUtil::Cancel(const std::string& host) {
+void NetSource::DnsUtil::Cancel(const std::string &host) {
     if (host.empty()) {
-        new_dns_.Cancel();
-        dns_.Cancel();
-    }
-    else {
-        new_dns_.Cancel(host);
-        dns_.Cancel(host);
+        mNewDns.Cancel();
+        mDns.Cancel();
+    } else {
+        mNewDns.Cancel(host);
+        mDns.Cancel(host);
     }
 }
 
-NetSource::NetSource(ActiveLogic& _active_logic)
-	: active_logic_(_active_logic)
-{
+NetSource::NetSource(ActiveLogic &activeLogic)
+        : mActiveLogic(activeLogic) {
     xinfo_function();
 }
 
@@ -90,76 +88,75 @@ NetSource::~NetSource() {
 /**
  *	host ip port setting from java
  */
-void NetSource::SetLongLink(const std::vector<std::string>& _hosts, const std::vector<uint16_t>& _ports, const std::string& _debugip) {
-	ScopedLock lock(sg_ip_mutex);
+void NetSource::SetLongLink(const std::vector<std::string> &hosts, const std::vector<uint16_t> &ports,
+                            const std::string &debugIp) {
+    ScopedLock lock(sg_ip_mutex);
 
-	xgroup2_define(addr_print);
-	xinfo2(TSF"task set longlink server addr, ") >> addr_print;
-	for (std::vector<std::string>::const_iterator host_iter = _hosts.begin(); host_iter != _hosts.end(); ++host_iter) {
-		xinfo2(TSF "host:%_ ", *host_iter) >> addr_print;
-	}
-	for (std::vector<uint16_t>::const_iterator port_iter = _ports.begin(); port_iter != _ports.end(); ++port_iter) {
-		xinfo2(TSF "port:%_ ", *port_iter) >> addr_print;
-	}
-	xinfo2(TSF"debugip:%_", _debugip) >> addr_print;
-
-    sg_longlink_debugip = _debugip;
-    if (!_hosts.empty()) {
-    	sg_longlink_hosts = _hosts;
+    xgroup2_define(addr_print);
+    xinfo2(TSF"task set longlink server addr, ") >> addr_print;
+    for (std::vector<std::string>::const_iterator host_iter = hosts.begin(); host_iter != hosts.end(); ++host_iter) {
+        xinfo2(TSF"host:%_ ", *host_iter) >> addr_print;
     }
-    else {
-    	xerror2(TSF"host list should not be empty");
+    for (std::vector<uint16_t>::const_iterator port_iter = ports.begin(); port_iter != ports.end(); ++port_iter) {
+        xinfo2(TSF"port:%_ ", *port_iter) >> addr_print;
     }
-	sg_longlink_ports = _ports;
+    xinfo2(TSF"debugip:%_", debugIp) >> addr_print;
+
+    sg_longlink_debugip = debugIp;
+    if (!hosts.empty()) {
+        sg_longlink_hosts = hosts;
+    } else {
+        xerror2(TSF"host list should not be empty");
+    }
+    sg_longlink_ports = ports;
 }
 
-void NetSource::SetShortlink(const uint16_t _port, const std::string& _debugip) {
-	ScopedLock lock(sg_ip_mutex);
+void NetSource::SetShortlink(const uint16_t port, const std::string &debugIp) {
+    ScopedLock lock(sg_ip_mutex);
 
-	xinfo2(TSF "task set shortlink server addr, port:%_, debugip:%_", _port, _debugip);
+    xinfo2(TSF"task set shortlink server addr, port:%_, debugip:%_", port, debugIp);
 
-	sg_shortlink_port = _port;
-    sg_shortlink_debugip = _debugip;
+    sg_shortlink_port = port;
+    sg_shortlink_debugip = debugIp;
 }
 
-void NetSource::SetBackupIPs(const std::string& _host, const std::vector<std::string>& _ips) {
-	ScopedLock lock(sg_ip_mutex);
+void NetSource::SetBackupIPs(const std::string &host, const std::vector<std::string> &ipList) {
+    ScopedLock lock(sg_ip_mutex);
 
-	xgroup2_define(addr_print);
-	xinfo2(TSF"task set backup server addr, host:%_", _host) >> addr_print;
-	for (std::vector<std::string>::const_iterator ip_iter = _ips.begin(); ip_iter != _ips.end(); ++ip_iter) {
-		xinfo2(TSF "ip:%_ ", *ip_iter) >> addr_print;
-	}
+    xgroup2_define(addr_print);
+    xinfo2(TSF"task set backup server addr, host:%_", host) >> addr_print;
+    for (std::vector<std::string>::const_iterator ip_iter = ipList.begin(); ip_iter != ipList.end(); ++ip_iter) {
+        xinfo2(TSF"ip:%_ ", *ip_iter) >> addr_print;
+    }
 
-	sg_host_backupips_mapping[_host] = _ips;
+    sg_host_backupips_mapping[host] = ipList;
 }
 
-void NetSource::SetDebugIP(const std::string& _host, const std::string& _ip) {
-	ScopedLock lock(sg_ip_mutex);
+void NetSource::SetDebugIP(const std::string &host, const std::string &ip) {
+    ScopedLock lock(sg_ip_mutex);
 
-	xinfo2(TSF "task set debugip:%_ for host:%_", _ip, _host);
+    xinfo2(TSF"task set debugip:%_ for host:%_", ip, host);
 
-	if (_ip.empty() && sg_host_debugip_mapping.find(_host) != sg_host_debugip_mapping.end()) {
-		sg_host_debugip_mapping.erase(_host);
-	}
-	else {
-		sg_host_debugip_mapping[_host] = _ip;
-	}
+    if (ip.empty() && sg_host_debugip_mapping.find(host) != sg_host_debugip_mapping.end()) {
+        sg_host_debugip_mapping.erase(host);
+    } else {
+        sg_host_debugip_mapping[host] = ip;
+    }
 }
 
-const std::string& NetSource::GetLongLinkDebugIP() {
-	ScopedLock lock(sg_ip_mutex);
+const std::string &NetSource::GetLongLinkDebugIP() {
+    ScopedLock lock(sg_ip_mutex);
 
-	return sg_longlink_debugip;
+    return sg_longlink_debugip;
 }
 
-const std::string& NetSource::GetShortLinkDebugIP() {
+const std::string &NetSource::GetShortLinkDebugIP() {
     ScopedLock lock(sg_ip_mutex);
     return sg_shortlink_debugip;
 }
 
-void NetSource::SetLowPriorityLonglinkPorts(const std::vector<uint16_t>& _lowpriority_longlink_ports) {
-    sg_lowpriority_longlink_ports = _lowpriority_longlink_ports;
+void NetSource::SetLowPriorityLonglinkPorts(const std::vector<uint16_t> &lowPriorityLonglinkPorts) {
+    sg_lowpriority_longlink_ports = lowPriorityLonglinkPorts;
 }
 
 /**
@@ -167,87 +164,90 @@ void NetSource::SetLowPriorityLonglinkPorts(const std::vector<uint16_t>& _lowpri
  * longlink functions
  *
  */
-const std::vector<std::string>& NetSource::GetLongLinkHosts() {
+const std::vector<std::string> &NetSource::GetLongLinkHosts() {
     ScopedLock lock(sg_ip_mutex);
-	return sg_longlink_hosts;
+    return sg_longlink_hosts;
 }
 
-void NetSource::GetLonglinkPorts(std::vector<uint16_t>& _ports) {
+void NetSource::GetLonglinkPorts(std::vector<uint16_t> &ports) {
     ScopedLock lock(sg_ip_mutex);
-	_ports = sg_longlink_ports;
+    ports = sg_longlink_ports;
 }
 
-bool NetSource::GetLongLinkItems(std::vector<IPPortItem>& _ipport_items, DnsUtil& _dns_util) {
+bool NetSource::GetLongLinkItems(std::vector<IPPortItem> &ipPortList, DnsUtil &dnsUtil) {
     xinfo_function();
     ScopedLock lock(sg_ip_mutex);
 
-    if (__GetLonglinkDebugIPPort(_ipport_items)) {
+    if (__GetLonglinkDebugIPPort(ipPortList)) {
         return true;
     }
-    
+
     lock.unlock();
 
- 	std::vector<std::string> longlink_hosts = NetSource::GetLongLinkHosts();
- 	if (longlink_hosts.empty()) {
- 		xerror2("longlink host empty.");
- 		return false;
- 	}
+    std::vector<std::string> longlink_hosts = NetSource::GetLongLinkHosts();
+    if (longlink_hosts.empty()) {
+        xerror2("longlink host empty.");
+        return false;
+    }
 
- 	__GetIPPortItems(_ipport_items, longlink_hosts, _dns_util, true);
+    __GetIPPortItems(ipPortList, longlink_hosts, dnsUtil, true);
 
-	return !_ipport_items.empty();
+    return !ipPortList.empty();
 }
 
-bool NetSource::__GetLonglinkDebugIPPort(std::vector<IPPortItem>& _ipport_items) {
+bool NetSource::__GetLonglinkDebugIPPort(std::vector<IPPortItem> &ipPortList) {
 
-	for (std::vector<std::string>::iterator ip_iter = sg_longlink_hosts.begin(); ip_iter != sg_longlink_hosts.end(); ++ip_iter) {
-		if (sg_host_debugip_mapping.find(*ip_iter) != sg_host_debugip_mapping.end()) {
-			for (std::vector<uint16_t>::iterator iter = sg_longlink_ports.begin(); iter != sg_longlink_ports.end(); ++iter) {
-				IPPortItem item;
-				item.str_ip = (*sg_host_debugip_mapping.find(*ip_iter)).second;
-				item.str_host = *ip_iter;
-				item.port = *iter;
-				item.source_type = kIPSourceDebug;
-				_ipport_items.push_back(item);
-			}
-			return true;
-		}
-	}
+    for (std::vector<std::string>::iterator ip_iter = sg_longlink_hosts.begin();
+         ip_iter != sg_longlink_hosts.end(); ++ip_iter) {
+        if (sg_host_debugip_mapping.find(*ip_iter) != sg_host_debugip_mapping.end()) {
+            for (std::vector<uint16_t>::iterator iter = sg_longlink_ports.begin();
+                 iter != sg_longlink_ports.end(); ++iter) {
+                IPPortItem item;
+                item.ip = (*sg_host_debugip_mapping.find(*ip_iter)).second;
+                item.host = *ip_iter;
+                item.port = *iter;
+                item.sourceType = kIPSourceDebug;
+                ipPortList.push_back(item);
+            }
+            return true;
+        }
+    }
 
     if (!sg_longlink_debugip.empty()) {
-        for (std::vector<uint16_t>::iterator iter = sg_longlink_ports.begin(); iter != sg_longlink_ports.end(); ++iter) {
+        for (std::vector<uint16_t>::iterator iter = sg_longlink_ports.begin();
+             iter != sg_longlink_ports.end(); ++iter) {
             IPPortItem item;
-            item.str_ip = sg_longlink_debugip;
-            item.str_host = sg_longlink_hosts.front();
+            item.ip = sg_longlink_debugip;
+            item.host = sg_longlink_hosts.front();
             item.port = *iter;
-            item.source_type = kIPSourceDebug;
-            _ipport_items.push_back(item);
+            item.sourceType = kIPSourceDebug;
+            ipPortList.push_back(item);
         }
         return true;
     }
-    
-	return false;
+
+    return false;
 }
 
-void NetSource::GetBackupIPs(std::string _host, std::vector<std::string>& _iplist) {
-	ScopedLock lock(sg_ip_mutex);
-	if (sg_host_backupips_mapping.find(_host) != sg_host_backupips_mapping.end()) {
-		_iplist = (*sg_host_backupips_mapping.find(_host)).second;
-	}
+void NetSource::GetBackupIPs(std::string const& host, std::vector<std::string> &ipList) {
+    ScopedLock lock(sg_ip_mutex);
+    if (sg_host_backupips_mapping.find(host) != sg_host_backupips_mapping.end()) {
+        ipList = (*sg_host_backupips_mapping.find(host)).second;
+    }
 }
 
-void NetSource::ReportLongIP(bool _is_success, const std::string& _ip, uint16_t _port) {
-    xinfo2_if(!_is_success, TSF"_is_success=%0, ip=%1, port=%2", _is_success, _ip, _port);
+void NetSource::ReportLongIP(bool isSuccess, const std::string &ip, uint16_t port) {
+    xinfo2_if(!isSuccess, TSF"isSuccess=%0, ip=%1, port=%2", isSuccess, ip, port);
 
-    if (_ip.empty() || 0 == _port) return;
+    if (ip.empty() || 0 == port) return;
 
     if (kNoNet == getNetInfo()) return;
 
-    ipportstrategy_.Update(_ip, _port, _is_success);
+    mIpPortStrategy.Update(ip, port, isSuccess);
 }
 
-void NetSource::RemoveLongBanIP(const std::string& _ip) {
-    ipportstrategy_.RemoveBannedList(_ip);
+void NetSource::RemoveLongBanIP(const std::string &ip) {
+    mIpPortStrategy.RemoveBannedList(ip);
 }
 
 /**
@@ -256,245 +256,242 @@ void NetSource::RemoveLongBanIP(const std::string& _ip) {
  *
  */
 uint16_t NetSource::GetShortLinkPort() {
-	ScopedLock lock(sg_ip_mutex);
-	return sg_shortlink_port;
-}
-
-bool NetSource::__HasShortLinkDebugIP(const std::vector<std::string>& _hostlist) {
-	if (!sg_shortlink_debugip.empty()) {
-		return true;
-	}
-
-	for (std::vector<std::string>::const_iterator host = _hostlist.begin(); host != _hostlist.end(); ++host) {
-		if (sg_host_debugip_mapping.find(*host) != sg_host_debugip_mapping.end()) {
-			return true;
-		}
-	}
-
-	return false;
-}
-
-bool NetSource::GetShortLinkItems(const std::vector<std::string>& _hostlist, std::vector<IPPortItem>& _ipport_items, DnsUtil& _dns_util) {
-	
     ScopedLock lock(sg_ip_mutex);
-    
-	if (__GetShortlinkDebugIPPort(_hostlist, _ipport_items)) {
-		return true;
+    return sg_shortlink_port;
+}
+
+bool NetSource::__HasShortLinkDebugIP(const std::vector<std::string> &hostList) {
+    if (!sg_shortlink_debugip.empty()) {
+        return true;
     }
-    
+
+    for (std::vector<std::string>::const_iterator host = hostList.begin(); host != hostList.end(); ++host) {
+        if (sg_host_debugip_mapping.find(*host) != sg_host_debugip_mapping.end()) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool NetSource::GetShortLinkItems(const std::vector<std::string> &hostList, std::vector<IPPortItem> &ipPortList,
+                                  DnsUtil &dnsUtil) {
+
+    ScopedLock lock(sg_ip_mutex);
+
+    if (__GetShortlinkDebugIPPort(hostList, ipPortList)) {
+        return true;
+    }
+
     lock.unlock();
 
-    if (_hostlist.empty()) return false;
-    __GetIPPortItems(_ipport_items, _hostlist, _dns_util, false);
+    if (hostList.empty()) return false;
+    __GetIPPortItems(ipPortList, hostList, dnsUtil, false);
 
-	return !_ipport_items.empty();
+    return !ipPortList.empty();
 }
 
-bool NetSource::__GetShortlinkDebugIPPort(const std::vector<std::string>& _hostlist, std::vector<IPPortItem>& _ipport_items) {
+bool NetSource::__GetShortlinkDebugIPPort(const std::vector<std::string> &hostList,
+                                          std::vector<IPPortItem> &ipPortList) {
 
-	for (std::vector<std::string>::const_iterator host = _hostlist.begin(); host != _hostlist.end(); ++host) {
-		if (sg_host_debugip_mapping.find(*host) != sg_host_debugip_mapping.end()) {
-			IPPortItem item;
-			item.str_ip = (*sg_host_debugip_mapping.find(*host)).second;
-			item.str_host = *host;
-			item.port = sg_shortlink_port;
-			item.source_type = kIPSourceDebug;
-			_ipport_items.push_back(item);
-			return true;
-		}
-	}
-    
-    if (!sg_shortlink_debugip.empty()) {
-        IPPortItem item;
-        item.str_ip = sg_shortlink_debugip;
-        item.str_host = _hostlist.front();
-        item.port = sg_shortlink_port;
-        item.source_type = kIPSourceDebug;
-        _ipport_items.push_back(item);
+    for (std::vector<std::string>::const_iterator host = hostList.begin(); host != hostList.end(); ++host) {
+        if (sg_host_debugip_mapping.find(*host) != sg_host_debugip_mapping.end()) {
+            IPPortItem item;
+            item.ip = (*sg_host_debugip_mapping.find(*host)).second;
+            item.host = *host;
+            item.port = sg_shortlink_port;
+            item.sourceType = kIPSourceDebug;
+            ipPortList.push_back(item);
+            return true;
+        }
     }
 
-	return !_ipport_items.empty();
+    if (!sg_shortlink_debugip.empty()) {
+        IPPortItem item;
+        item.ip = sg_shortlink_debugip;
+        item.host = hostList.front();
+        item.port = sg_shortlink_port;
+        item.sourceType = kIPSourceDebug;
+        ipPortList.push_back(item);
+    }
+
+    return !ipPortList.empty();
 }
 
-void NetSource::__GetIPPortItems(std::vector<IPPortItem>& _ipport_items, const std::vector<std::string>& _hostlist, DnsUtil& _dns_util, bool _islonglink) {
-	if (active_logic_.IsActive()) {
-		unsigned int merge_type_count = 0;
-		unsigned int makelist_count = kNumMakeCount;
+void NetSource::__GetIPPortItems(std::vector<IPPortItem> &ipPortList, const std::vector<std::string> &hostList,
+                                 DnsUtil &dnsUtil, bool isLongLink) {
+    if (mActiveLogic.IsActive()) {
+        unsigned int merge_type_count = 0;
+        unsigned int makelist_count = kNumMakeCount;
 
-		for (std::vector<std::string>::const_iterator iter = _hostlist.begin(); iter != _hostlist.end(); ++iter) {
-			if (merge_type_count == 1 && _ipport_items.size() == kNumMakeCount) makelist_count = kNumMakeCount + 1;
+        for (std::vector<std::string>::const_iterator iter = hostList.begin(); iter != hostList.end(); ++iter) {
+            if (merge_type_count == 1 && ipPortList.size() == kNumMakeCount) makelist_count = kNumMakeCount + 1;
 
-			if (0 < __MakeIPPorts(_ipport_items, *iter, makelist_count, _dns_util, false, _islonglink)) merge_type_count++;
-		}
+            if (0 < __MakeIPPorts(ipPortList, *iter, makelist_count, dnsUtil, false, isLongLink))
+                merge_type_count++;
+        }
 
-		for (std::vector<std::string>::const_iterator iter = _hostlist.begin(); iter != _hostlist.end(); ++iter) {
-			if (merge_type_count == 1 && _ipport_items.size() == kNumMakeCount) makelist_count = kNumMakeCount + 1;
+        for (std::vector<std::string>::const_iterator iter = hostList.begin(); iter != hostList.end(); ++iter) {
+            if (merge_type_count == 1 && ipPortList.size() == kNumMakeCount) makelist_count = kNumMakeCount + 1;
 
-			if (0 < __MakeIPPorts(_ipport_items, *iter, makelist_count, _dns_util, true, _islonglink)) merge_type_count++;
-		}
-	}
-	else {
-		size_t host_count = _hostlist.size();
-		size_t ret = (kNumMakeCount - 1) / host_count;
-		size_t ret2 = (kNumMakeCount - 1) % host_count;
-		size_t i = 0;
-		size_t count = 0;
+            if (0 < __MakeIPPorts(ipPortList, *iter, makelist_count, dnsUtil, true, isLongLink))
+                merge_type_count++;
+        }
+    } else {
+        size_t host_count = hostList.size();
+        size_t ret = (kNumMakeCount - 1) / host_count;
+        size_t ret2 = (kNumMakeCount - 1) % host_count;
+        size_t i = 0;
+        size_t count = 0;
 
-		for (std::vector<std::string>::const_iterator host_iter = _hostlist.begin(); host_iter != _hostlist.end() && count < kNumMakeCount - 1; ++host_iter) {
-			count += i < ret2 ? ret + 1 : ret;
-			__MakeIPPorts(_ipport_items, *host_iter, count, _dns_util, false, _islonglink);
-			i++;
-		}
+        for (std::vector<std::string>::const_iterator host_iter = hostList.begin();
+             host_iter != hostList.end() && count < kNumMakeCount - 1; ++host_iter) {
+            count += i < ret2 ? ret + 1 : ret;
+            __MakeIPPorts(ipPortList, *host_iter, count, dnsUtil, false, isLongLink);
+            i++;
+        }
 
-		for (std::vector<std::string>::const_iterator host_iter = _hostlist.begin(); host_iter != _hostlist.end() && count < kNumMakeCount; ++host_iter) {
-			__MakeIPPorts(_ipport_items, *host_iter, kNumMakeCount, _dns_util, true, _islonglink);
-		}
-	}
+        for (std::vector<std::string>::const_iterator host_iter = hostList.begin();
+             host_iter != hostList.end() && count < kNumMakeCount; ++host_iter) {
+            __MakeIPPorts(ipPortList, *host_iter, kNumMakeCount, dnsUtil, true, isLongLink);
+        }
+    }
 }
 
-size_t NetSource::__MakeIPPorts(std::vector<IPPortItem>& _ip_items, const std::string& _host, size_t _count, DnsUtil& _dns_util, bool _isbackup, bool _islonglink) {
+size_t NetSource::__MakeIPPorts(std::vector<IPPortItem> &_ip_items, const std::string &host, size_t _count,
+                                DnsUtil &dnsUtil, bool isBackup, bool isLongLink) {
 
-	IPSourceType ist = kIPSourceNULL;
-	std::vector<std::string> iplist;
+    IPSourceType ist = kIPSourceNULL;
+    std::vector<std::string> iplist;
     std::vector<uint16_t> ports;
 
-	if (!_isbackup) {
-		DnsProfile dns_profile;
-		dns_profile.host = _host;
+    if (!isBackup) {
+        DnsProfile dns_profile;
+        dns_profile.host = host;
 
-		bool ret = _dns_util.GetNewDNS().GetHostByName(_host, iplist);
+        bool ret = dnsUtil.GetNewDNS().GetHostByName(host, iplist);
 
-		dns_profile.end_time = gettickcount();
-		if (!ret) dns_profile.OnFailed();
-		ReportDnsProfile(dns_profile);
+        dns_profile.endTime = gettickcount();
+        if (!ret) dns_profile.OnFailed();
+        ReportDnsProfile(dns_profile);
 
-		xgroup2_define(dnsxlog);
-		xdebug2(TSF"link host:%_, new dns ret:%_, size:%_ ", _host, ret, iplist.size()) >> dnsxlog;
+        xgroup2_define(dnsxlog);
+        xdebug2(TSF"link host:%_, new dns ret:%_, size:%_ ", host, ret, iplist.size()) >> dnsxlog;
 
-		if (iplist.empty()) {
-			dns_profile.Reset();
-			dns_profile.dnstype = kType_Dns;
+        if (iplist.empty()) {
+            dns_profile.Reset();
+            dns_profile.dnsType = kType_Dns;
 
-			ist = kIPSourceDNS;
-			ret = _dns_util.GetDNS().GetHostByName(_host, iplist);
+            ist = kIPSourceDNS;
+            ret = dnsUtil.GetDNS().GetHostByName(host, iplist);
 
-			dns_profile.end_time = gettickcount();
-			if (!ret) dns_profile.OnFailed();
-			ReportDnsProfile(dns_profile);
+            dns_profile.endTime = gettickcount();
+            if (!ret) dns_profile.OnFailed();
+            ReportDnsProfile(dns_profile);
 
-			xdebug2(TSF "dns ret:%_, size:%_,", ret, iplist.size()) >> dnsxlog;
-		}
-		else {
-			ist = kIPSourceNewDns;
-		}
-
-		if (_islonglink) {
-			NetSource::GetLonglinkPorts(ports);
-		}
-		else {
-			ports.push_back(NetSource::GetShortLinkPort());
-		}
-	}
-	else {
-		NetSource::GetBackupIPs(_host, iplist);
-		xdebug2(TSF"link host:%_, backup ips size:%_", _host, iplist.size());
-        
-        if (iplist.empty() && _dns_util.GetDNS().GetHostByName(_host, iplist)) {
-            ScopedLock lock(sg_ip_mutex);
-            sg_host_backupips_mapping[_host] = iplist;
+            xdebug2(TSF"dns ret:%_, size:%_,", ret, iplist.size()) >> dnsxlog;
+        } else {
+            ist = kIPSourceNewDns;
         }
-        
-		if (_islonglink) {
+
+        if (isLongLink) {
+            NetSource::GetLonglinkPorts(ports);
+        } else {
+            ports.push_back(NetSource::GetShortLinkPort());
+        }
+    } else {
+        NetSource::GetBackupIPs(host, iplist);
+        xdebug2(TSF"link host:%_, backup ips size:%_", host, iplist.size());
+
+        if (iplist.empty() && dnsUtil.GetDNS().GetHostByName(host, iplist)) {
+            ScopedLock lock(sg_ip_mutex);
+            sg_host_backupips_mapping[host] = iplist;
+        }
+
+        if (isLongLink) {
             if (sg_lowpriority_longlink_ports.empty()) {
                 NetSource::GetLonglinkPorts(ports);
             } else {
                 ports = sg_lowpriority_longlink_ports;
             }
-		}
-		else {
-			ports.push_back(NetSource::GetShortLinkPort());
-		}
-		ist = kIPSourceBackup;
-		if (!iplist.empty() && !ports.empty())
-		{
-			std::set<std::string> setIps;
-			for (auto it = _ip_items.begin(); it != _ip_items.end(); ++it)
-			{
-				setIps.insert(it->str_ip);
-			}
-			size_t ports_cnt = ports.size();
-			size_t require_cnt = _count - _ip_items.size();
-			if (require_cnt < ports_cnt) require_cnt += ports_cnt;
-			size_t cur_cnt = iplist.size() * ports_cnt;
-			size_t i = 0;
-			while (cur_cnt > require_cnt && i < iplist.size())
-			{
-				if (setIps.find(iplist[i]) != setIps.end())
-				{
-					iplist.erase(iplist.begin() + i);
-					cur_cnt -= ports_cnt;
-				}
-				else
-				{
-					i++;
-				}
-			}
-		}
-	}
+        } else {
+            ports.push_back(NetSource::GetShortLinkPort());
+        }
+        ist = kIPSourceBackup;
+        if (!iplist.empty() && !ports.empty()) {
+            std::set<std::string> setIps;
+            for (auto it = _ip_items.begin(); it != _ip_items.end(); ++it) {
+                setIps.insert(it->ip);
+            }
+            size_t ports_cnt = ports.size();
+            size_t require_cnt = _count - _ip_items.size();
+            if (require_cnt < ports_cnt) require_cnt += ports_cnt;
+            size_t cur_cnt = iplist.size() * ports_cnt;
+            size_t i = 0;
+            while (cur_cnt > require_cnt && i < iplist.size()) {
+                if (setIps.find(iplist[i]) != setIps.end()) {
+                    iplist.erase(iplist.begin() + i);
+                    cur_cnt -= ports_cnt;
+                } else {
+                    i++;
+                }
+            }
+        }
+    }
 
-	if (iplist.empty()) return 0;
+    if (iplist.empty()) return 0;
 
-	size_t len = _ip_items.size();
+    size_t len = _ip_items.size();
 
-	std::vector<IPPortItem> temp_items;
-	for (std::vector<std::string>::iterator ip_iter = iplist.begin(); ip_iter != iplist.end(); ++ip_iter) {
-		for (std::vector<uint16_t>::iterator port_iter = ports.begin(); port_iter != ports.end(); ++port_iter) {
-			IPPortItem item;
-			item.str_ip = *ip_iter;
-			item.source_type = ist;
-			item.str_host = _host;
-			item.port = *port_iter;
-			temp_items.push_back(item);
-		}
-	}
+    std::vector<IPPortItem> temp_items;
+    for (std::vector<std::string>::iterator ip_iter = iplist.begin(); ip_iter != iplist.end(); ++ip_iter) {
+        for (std::vector<uint16_t>::iterator port_iter = ports.begin(); port_iter != ports.end(); ++port_iter) {
+            IPPortItem item;
+            item.ip = *ip_iter;
+            item.sourceType = ist;
+            item.host = host;
+            item.port = *port_iter;
+            temp_items.push_back(item);
+        }
+    }
 
-	if (!_isbackup) {
-		ipportstrategy_.SortandFilter(temp_items, (int)(_count - len));
-		_ip_items.insert(_ip_items.end(), temp_items.begin(), temp_items.end());
-	}
-	else {
-		_ip_items.insert(_ip_items.end(), temp_items.begin(), temp_items.end());
-		srand((unsigned)gettickcount());
-		std::random_shuffle(_ip_items.begin() + len, _ip_items.end());
-		_ip_items.resize(std::min(_ip_items.size(), (size_t)_count));
-	}
+    if (!isBackup) {
+        mIpPortStrategy.SortandFilter(temp_items, (int) (_count - len));
+        _ip_items.insert(_ip_items.end(), temp_items.begin(), temp_items.end());
+    } else {
+        _ip_items.insert(_ip_items.end(), temp_items.begin(), temp_items.end());
+        srand((unsigned) gettickcount());
+        std::random_shuffle(_ip_items.begin() + len, _ip_items.end());
+        _ip_items.resize(std::min(_ip_items.size(), (size_t) _count));
+    }
 
-	return _ip_items.size();
+    return _ip_items.size();
 }
 
-void NetSource::ReportShortIP(bool _is_success, const std::string& _ip, const std::string& _host, uint16_t _port) {
-    xinfo2_if(!_is_success, TSF"_is_success=%0, ip=%1, port=%2 host=%3", _is_success, _ip, _port, _host);
+void NetSource::ReportShortIP(bool isSuccess, const std::string &ip, const std::string &host, uint16_t port) {
+    xinfo2_if(!isSuccess, TSF"isSuccess=%0, ip=%1, port=%2 host=%3", isSuccess, ip, port, host);
 
-    if (_ip.empty()) return;
+    if (ip.empty()) return;
 
     if (kNoNet == getNetInfo()) return;
 
-    ipportstrategy_.Update(_ip, _port, _is_success);
+    mIpPortStrategy.Update(ip, port, isSuccess);
 }
 
 void NetSource::ClearCache() {
     xinfo_function();
-    ipportstrategy_.InitHistory2BannedList(true);
+    mIpPortStrategy.InitHistory2BannedList(true);
 }
 
-std::string NetSource::DumpTable(const std::vector<IPPortItem>& _ipport_items) {
+std::string NetSource::DumpTable(const std::vector<IPPortItem> &ipPortList) {
     XMessage stream;
 
-    for (unsigned int i = 0; i < _ipport_items.size(); ++i) {
-        stream << _ipport_items[i].str_ip << kItemDelimiter << _ipport_items[i].port << kItemDelimiter << _ipport_items[i].str_host
-               << kItemDelimiter << IPSourceTypeString[_ipport_items[i].source_type];
+    for (unsigned int i = 0; i < ipPortList.size(); ++i) {
+        stream << ipPortList[i].ip << kItemDelimiter << ipPortList[i].port << kItemDelimiter
+               << ipPortList[i].host
+               << kItemDelimiter << IPSourceTypeString[ipPortList[i].sourceType];
 
-        if (i != _ipport_items.size() - 1) {
+        if (i != ipPortList.size() - 1) {
             stream << "|";
         }
     }
@@ -502,15 +499,15 @@ std::string NetSource::DumpTable(const std::vector<IPPortItem>& _ipport_items) {
     return stream.String();
 }
 
-bool NetSource::GetLongLinkSpeedTestIPs(std::vector<IPPortItem>& _ip_vec) {
+bool NetSource::GetLongLinkSpeedTestIPs(std::vector<IPPortItem> &ipPortList) {
     xverbose_function();
 
     return true;
 }
 
-void NetSource::ReportLongLinkSpeedTestResult(std::vector<IPPortItem>& _ip_vec) {
+void NetSource::ReportLongLinkSpeedTestResult(std::vector<IPPortItem> &ipPortList) {
 }
 
-void NetSource::AddServerBan(const std::string& _ip) {
-    ipportstrategy_.AddServerBan(_ip);
+void NetSource::AddServerBan(const std::string &ip) {
+    mIpPortStrategy.AddServerBan(ip);
 }

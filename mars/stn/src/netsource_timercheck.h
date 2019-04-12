@@ -33,42 +33,50 @@
 class CommFrequencyLimit;
 
 namespace mars {
-    namespace stn {
-        
+namespace stn {
+
 class LongLink;
 
 class NetSourceTimerCheck {
-  public:
-    NetSourceTimerCheck(NetSource* _net_source, ActiveLogic& _active_logic, LongLink& _longlink, MessageQueue::MessageQueue_t  _messagequeue_id);
+public:
+    NetSourceTimerCheck(NetSource *netSource, ActiveLogic &activeLogic, LongLink &longLink,
+                        MessageQueue::MessageQueue_t msgQueueId);
+
     ~NetSourceTimerCheck();
+
     void CancelConnect();
 
-  public:
-    boost::function<void ()> fun_time_check_suc_;
+public:
+    boost::function<void()> TimeCheckSuccHook;
 
-  private:
-    void __Run(const std::string& _host);
-    bool __TryConnnect(const std::string& _host);
-    void __OnActiveChanged(bool _is_active);
+private:
+    void __Run(const std::string &host);
+
+    bool __TryConnnect(const std::string &host);
+
+    void __OnActiveChanged(bool isActive);
+
     void __StartCheck();
+
     void __Check();
+
     void __StopCheck();
 
-  private:
-    Thread thread_;
-    boost::signals2::scoped_connection active_connection_;
-    NetSource* net_source_;
-    SocketBreaker breaker_;
-    SocketSelect seletor_;
-    CommFrequencyLimit* frequency_limit_;
-    LongLink& longlink_;
+private:
+    Thread mThread;
+    boost::signals2::scoped_connection ActiveConn;
+    NetSource *mNetSource;
+    SocketBreaker mBreaker;
+    SocketSelect mSelector;
+    CommFrequencyLimit *mFrequencyLimit;
+    LongLink &mLongLink;
 
-    MessageQueue::ScopeRegister asyncreg_;
-    MessageQueue::MessagePost_t asyncpost_;
-    NetSource::DnsUtil dns_util_;
+    MessageQueue::ScopeRegister mAsyncReg;
+    MessageQueue::MessagePost_t mAsyncPost;
+    NetSource::DnsUtil mDnsUtil;
 };
-        
-    }
+
+}
 }
 
 

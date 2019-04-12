@@ -29,18 +29,26 @@ namespace mars {
 namespace stn {
 
 class ShortLinkInterface {
-  public:
-	virtual ~ShortLinkInterface(){};
+public:
+    virtual ~ShortLinkInterface() {};
 
-	virtual void            SendRequest(AutoBuffer& _buffer_req, AutoBuffer& _buffer_extend) = 0;
-	virtual ConnectProfile  Profile() const { return ConnectProfile();}
+    virtual void SendRequest(AutoBuffer &bufferReq, AutoBuffer &bufExt) = 0;
 
-    CallBack<boost::function<void (int _line, ErrCmdType _errtype, int _errcode, const std::string& _ip, const std::string& _host, uint16_t _port)> > func_network_report;
-    CallBack<boost::function<void (ShortLinkInterface* _worker, ErrCmdType _err_type, int _status, AutoBuffer& _body, AutoBuffer& _extension, bool _cancel_retry, ConnectProfile& _conn_profile)> > OnResponse;
-    CallBack<boost::function<void (ShortLinkInterface* _worker)> > OnSend;
-	CallBack<boost::function<void (ShortLinkInterface* _worker, unsigned int _cached_size, unsigned int _total_size)> > OnRecv;
+    virtual ConnectProfile Profile() const { return ConnectProfile(); }
+
+    CallBack<boost::function<void(int _line, ErrCmdType errType, int errCode, const std::string &ip,
+                                  const std::string &host, uint16_t port)> > OnNetReport;
+
+    CallBack<boost::function<void(ShortLinkInterface *worker, ErrCmdType errType, int status, AutoBuffer &body,
+                                  AutoBuffer &extension, bool cancelRetry,
+                                  ConnectProfile &connProfile)> > OnResponse;
+
+    CallBack<boost::function<void(ShortLinkInterface *worker)> > OnSend;
+
+    CallBack<boost::function<void(ShortLinkInterface *worker, unsigned int cachedSize,
+                                  unsigned int totalSize)> > OnRecv;
 };
-    
+
 }
 }
 

@@ -44,8 +44,8 @@ typedef struct
 
 }TestInputItem;
 
-extern int __CurActiveState(const ActiveLogic& _activeLogic) ;
-extern unsigned long __Interval(int _type, const ActiveLogic& _activeLogic);
+extern int __CurActiveState(const ActiveLogic& activeLogic) ;
+extern unsigned long __Interval(int type, const ActiveLogic& activeLogic);
 
 
 

@@ -45,23 +45,23 @@ public:
 	bool Mine_GetLongLinkItems(std::vector<IPPortItem>& _IPPortItems);
 	bool Mine_GetMixLongLinkItems(std::vector<IPPortItem>& _IPPortItems);
 	
-	void Mine_ReportLongIP(bool _isSuccess, const std::string& _ip, unsigned int _port);
+	void Mine_ReportLongIP(bool isSuccess, const std::string& ip, unsigned int port);
 
 	//1:
 	bool Mine_MakeSureConnected(bool* _newone=NULL);
 	SOCKET Mine_RunConnect();
-	void Mine_ConnectStatus(TLongLinkStatus _status);
-	bool Mine_TryConnect(const string& _host);
+	void Mine_ConnectStatus(TLongLinkStatus status);
+	bool Mine_TryConnect(const string& host);
 
 	static bool (CDetour::* Real_GetLongLinkItems)(std::vector<IPPortItem>& _IPPortItems);
 	static bool (CDetour::* Real_GetMixLongLinkItems)(std::vector<IPPortItem>& _IPPortItems);
-	static void (CDetour::* Real_ReportLongIP)(bool _isSuccess, const std::string& _ip, unsigned int _port);
+	static void (CDetour::* Real_ReportLongIP)(bool isSuccess, const std::string& ip, unsigned int port);
 
 	//2:
 	static  bool (CDetour::* Real_MakeSureConnected)(bool* _newone);
 	static  SOCKET (CDetour::* Real_RunConnect)();
-	static  void (CDetour::* Real_ConnectStatus)(TLongLinkStatus _status);
-	static bool (CDetour::* Real_TryConnect)(const string& _host);
+	static  void (CDetour::* Real_ConnectStatus)(TLongLinkStatus status);
+	static bool (CDetour::* Real_TryConnect)(const string& host);
 };
 
 static Condition sg_Condition; //global
@@ -211,19 +211,19 @@ bool CDetour::Mine_GetMixLongLinkItems(std::vector<IPPortItem>& _IPPortItems)
 	return true;
 }
 
-void CDetour::Mine_ReportLongIP(bool _isSuccess, const std::string& _ip, unsigned int _port)
+void CDetour::Mine_ReportLongIP(bool isSuccess, const std::string& ip, unsigned int port)
 {
 	//every ip complexConnect failed, will be called here
 	static int times = 0;
-	(this->*Real_ReportLongIP)(_isSuccess, _ip, _port);
-	printf("%s:line:%d, isSuccess:%d, ip:%s:%u\n", __FUNCTION__, __LINE__, _isSuccess,_ip.c_str(), _port);
+	(this->*Real_ReportLongIP)(isSuccess, ip, port);
+	printf("%s:line:%d, isSuccess:%d, ip:%s:%u\n", __FUNCTION__, __LINE__, isSuccess,ip.c_str(), port);
 	times++;
 	printf("@@@@@@@@@@@ReportLongIP:  times=%d\n", times);
-	if(!_isSuccess)
+	if(!isSuccess)
 	{
 		IPPortItem tempItem;
-		tempItem.strIP = _ip;
-		tempItem.nPort = _port;
+		tempItem.strIP = ip;
+		tempItem.nPort = port;
 		killNormalEcho(tempItem);
 	}
 }
@@ -315,12 +315,12 @@ static void printLonglinkConnInfo()
 }
 
 
-void CDetour::Mine_ConnectStatus(TLongLinkStatus _status)
+void CDetour::Mine_ConnectStatus(TLongLinkStatus status)
 {
-	(this->*Real_ConnectStatus)(_status);
-	printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~status %d\n",_status);
+	(this->*Real_ConnectStatus)(status);
+	printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~status %d\n",status);
 
-	if((MMLongLink2::EConnected != _status)) return;
+	if((MMLongLink2::EConnected != status)) return;
 
 	if(0 == sg_TestType)
 	{
@@ -411,10 +411,10 @@ void CDetour::Mine_ConnectStatus(TLongLinkStatus _status)
 	}
 }
 
-bool CDetour::Mine_TryConnect(const string& _host)
+bool CDetour::Mine_TryConnect(const string& host)
 {
-	printf("_host=%s\n",_host.c_str());
-	//(this->*Real_TryConnect)(_host);
+	printf("host=%s\n",host.c_str());
+	//(this->*Real_TryConnect)(host);
 	if(3 == sg_TestType&&sg_readyToSwitchBackToSatelliteIdc)
 	{
 		std::vector<IPPortItem>::iterator iter = sg_restoreSatelliteIdcIPs.begin();
@@ -445,7 +445,7 @@ bool CDetour::Mine_TryConnect(const string& _host)
 
 bool (CDetour::* CDetour::Real_GetLongLinkItems)(std::vector<IPPortItem>& _IPPortItems) = (bool (CDetour::*)(std::vector<IPPortItem>& _IPPortItems)) &CMMNetSource::GetLongLinkItems;
 bool (CDetour::* CDetour::Real_GetMixLongLinkItems)(std::vector<IPPortItem>& _IPPortItems) = (bool (CDetour::*)(std::vector<IPPortItem>& _IPPortItems)) &CMMNetSource::GetMixLongLinkItems;
-void (CDetour::* CDetour::Real_ReportLongIP)(bool _isSuccess, const std::string& _ip, unsigned int _port) = (void (CDetour::*)(bool _isSuccess, const std::string& _ip, unsigned int _port)) &CMMNetSource::ReportLongIP;
+void (CDetour::* CDetour::Real_ReportLongIP)(bool isSuccess, const std::string& ip, unsigned int port) = (void (CDetour::*)(bool isSuccess, const std::string& ip, unsigned int port)) &CMMNetSource::ReportLongIP;
 //4:
 bool (CDetour::* CDetour::Real_MakeSureConnected)(bool* _newone)=(bool (CDetour::*)(bool* _newone)) &MMLongLink2::MakeSureConnected;
 
@@ -454,14 +454,14 @@ bool (CDetour::* CDetour::Real_MakeSureConnected)(bool* _newone)=(bool (CDetour:
 void * p1 = (void *)DetourFindFunction("test.exe","MMLongLink2::__RunConnect");
 SOCKET (CDetour::* CDetour::Real_RunConnect)()=(SOCKET (CDetour::* &)()) p1;
 void * p2 = (void *)DetourFindFunction("test.exe","MMLongLink2::__ConnectStatus");
-void (CDetour::* CDetour::Real_ConnectStatus)(TLongLinkStatus _status)=(void (CDetour::* &)(TLongLinkStatus )) p2;
+void (CDetour::* CDetour::Real_ConnectStatus)(TLongLinkStatus status)=(void (CDetour::* &)(TLongLinkStatus )) p2;
 void * p3 = (void *)DetourFindFunction("test.exe","CMMNetSourceTimerCheck::__TryConnnect");
-bool (CDetour::* CDetour::Real_TryConnect)(const string& _host)=(bool (CDetour::* &)(const string&)) p3;
+bool (CDetour::* CDetour::Real_TryConnect)(const string& host)=(bool (CDetour::* &)(const string&)) p3;
 //-------------private end
 
 static bool (CDetour::* Mine_Target1)(std::vector<IPPortItem>& _IPPortItems) = &CDetour::Mine_GetLongLinkItems;
 static bool (CDetour::* Mine_Target2)(std::vector<IPPortItem>& _IPPortItems) = &CDetour::Mine_GetMixLongLinkItems;
-static void (CDetour::* Mine_Target3)(bool _isSuccess, const std::string& _ip, unsigned int _port) = &CDetour::Mine_ReportLongIP;
+static void (CDetour::* Mine_Target3)(bool isSuccess, const std::string& ip, unsigned int port) = &CDetour::Mine_ReportLongIP;
 //5:
 static bool (CDetour::* Mine_Target4)(bool* _newone) = &CDetour::Mine_MakeSureConnected;
 
@@ -524,9 +524,9 @@ static void UnHookPrivateMemberFn()
 
 }
 
-static int CallBack(int _from, ErrCmdType _eErrType, int _nErrCode, const AutoBuffer& _cookies, int _nHashCode, const CNetCmd& _cmd, unsigned int _taskcosttime)
+static int CallBack(int _from, ErrCmdType _eErrType, int _nErrCode, const AutoBuffer& _cookies, int _nHashCode, const CNetCmd& _cmd, unsigned int taskCostTime)
 {
-	printf("from:%d, errType:%d errCode:%d hashCode:%d, costTime:%u\n", _from, _eErrType, _nErrCode, _nHashCode, _taskcosttime);
+	printf("from:%d, errType:%d errCode:%d hashCode:%d, costTime:%u\n", _from, _eErrType, _nErrCode, _nHashCode, taskCostTime);
 
 	//sg_Condition.notifyOne();
 
@@ -622,13 +622,13 @@ static std::string FONT_BLUE_WRAPPER(std::string _str)
 #define CHINESE_WORDING_SECTION "Chinese Wording"
 #define ENGLISH_WORDING_SECTION "English Wording"
 
-static std::string get_english_wording_from_ini(const char* _key)
+static std::string get_english_wording_from_ini(const char* key)
 {
-	return UtilFunc::get_wording_from_ini(_key,ENGLISH_WORDING_SECTION, INI_FILE);
+	return UtilFunc::get_wording_from_ini(key,ENGLISH_WORDING_SECTION, INI_FILE);
 }
-static std::string get_chinese_wording_from_ini(const char* _key)
+static std::string get_chinese_wording_from_ini(const char* key)
 {
-	return UtilFunc::get_wording_from_ini(_key,CHINESE_WORDING_SECTION, INI_FILE);
+	return UtilFunc::get_wording_from_ini(key,CHINESE_WORDING_SECTION, INI_FILE);
 }
 
 
@@ -729,13 +729,13 @@ static const std::string  NEW_EVENT2_VIRIABLE_DISCRIPTION = get_english_wording_
 
 
 /*
-static bool save_english_wording_to_ini(const char* _key, const char* _value)
+static bool save_english_wording_to_ini(const char* key, const char* value)
 {
-	return UtilFunc::save_wording_to_ini(_key, _value, ENGLISH_WORDING_SECTION, INI_FILE);
+	return UtilFunc::save_wording_to_ini(key, value, ENGLISH_WORDING_SECTION, INI_FILE);
 }
-static bool save_chinese_wording_to_ini(const char* _key, const char* _value)
+static bool save_chinese_wording_to_ini(const char* key, const char* value)
 {
-	return UtilFunc::save_wording_to_ini(_key, _value, CHINESE_WORDING_SECTION, INI_FILE);
+	return UtilFunc::save_wording_to_ini(key, value, CHINESE_WORDING_SECTION, INI_FILE);
 }
 void SavaAllWordingToIni()
 {
@@ -998,11 +998,11 @@ static void InitWinSock(TestCaseInfo *m_testCaseInfo)
 }
 #define EACH_SITUATION_RUN_COUNT 1
 
-static void addIpToList(std::vector<IPPortItem>& _ItemList, const char* _ip, unsigned short _port)
+static void addIpToList(std::vector<IPPortItem>& _ItemList, const char* ip, unsigned short port)
 {
 	IPPortItem tempItem;
-	tempItem.strIP.append(_ip);
-	tempItem.nPort = _port;
+	tempItem.strIP.append(ip);
+	tempItem.nPort = port;
 	_ItemList.push_back(tempItem);
 }
 static void addAllSatelliteIPtoItemList(std::vector<IPPortItem>& _ItemList)
@@ -1035,11 +1035,11 @@ static void addAllNewdnsIPtoItemList(std::vector<IPPortItem>& _ItemList)
 		}
 	}
 }
-static bool startNewdnsMockServer(const char* _ip, unsigned int _port)
+static bool startNewdnsMockServer(const char* ip, unsigned int port)
 {
 	_chdir(NETSOURCE_CHDIR_DIR);
 	char tmpCmd[1024] = {0};
-	snprintf(tmpCmd, sizeof(tmpCmd), START_NEWDNS_SERVER_CMD, _ip, _port);
+	snprintf(tmpCmd, sizeof(tmpCmd), START_NEWDNS_SERVER_CMD, ip, port);
 	printf("line:%d,tempCmd=%s\n",__LINE__, tmpCmd);
 	FILE* f = _popen(tmpCmd , "rt");
 	if(NULL == f)   

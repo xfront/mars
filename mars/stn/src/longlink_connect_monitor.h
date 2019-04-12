@@ -31,59 +31,69 @@
 class ActiveLogic;
 
 namespace mars {
-    namespace stn {
-        
+namespace stn {
+
 class LongLinkConnectMonitor {
-  public:
-    LongLinkConnectMonitor(ActiveLogic& _activelogic, LongLink& _longlinkk, MessageQueue::MessageQueue_t _id);
+public:
+    LongLinkConnectMonitor(ActiveLogic &activeLogic, LongLink &longLink, MessageQueue::MessageQueue_t id);
+
     ~LongLinkConnectMonitor();
 
-  public:
+public:
     bool MakeSureConnected();
+
     bool NetworkChange();
 
-  public:
-    boost::function<void ()> fun_longlink_reset_;
+public:
+    boost::function<void()> LongLinkResetHook;
 
-  private:
-    uint64_t  __IntervalConnect(int _type);
-    uint64_t  __AutoIntervalConnect();
+private:
+    uint64_t __IntervalConnect(int type);
 
-  private:
-    void __OnSignalForeground(bool _isforeground);
-    void __OnSignalActive(bool _isactive);
-    void __OnLongLinkStatuChanged(LongLink::TLongLinkStatus _status);
+    uint64_t __AutoIntervalConnect();
+
+private:
+    void __OnSignalForeground(bool isForeground);
+
+    void __OnSignalActive(bool isActive);
+
+    void __OnLongLinkStatuChanged(LongLink::TLongLinkStatus status);
+
     void __OnAlarm();
 
     void __Run();
+
 #ifdef __APPLE__
     bool __StartTimer();
     bool __StopTimer();
 #endif
+
     void __ReConnect();
-    
-  private:
-    LongLinkConnectMonitor(const LongLinkConnectMonitor&);
-    LongLinkConnectMonitor& operator=(const LongLinkConnectMonitor&);
 
-  private:
-    MessageQueue::ScopeRegister     asyncreg_;
-    ActiveLogic& activelogic_;
-    LongLink& longlink_;
-    Alarm         alarm_;
-    Mutex         mutex_;
+private:
+    LongLinkConnectMonitor(const LongLinkConnectMonitor &);
 
-    LongLink::TLongLinkStatus status_;
-    uint64_t last_connect_time_;
-    int last_connect_net_type_;
+    LongLinkConnectMonitor &operator=(const LongLinkConnectMonitor &);
 
-    Thread thread_;
-    Mutex testmutex_;
+private:
+    MessageQueue::ScopeRegister mAsyncReg;
+    ActiveLogic &mActiveLogic;
+    LongLink &mLongLink;
+    Alarm mAlarm;
+    Mutex mMutex;
 
-    int conti_suc_count_;
-    bool isstart_;
+    LongLink::TLongLinkStatus mStatus;
+    uint64_t mLastConnectTime;
+    int mLastConnectNetType;
+
+    Thread mThread;
+    Mutex mTestMutex;
+
+    int mContiSuccCount;
+    bool mIsStart;
 };
-        
-} }
+
+}
+}
 
 #endif // STN_SRC_LONGLINK_CONNECT_MONITOR_H_

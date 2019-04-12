@@ -1,16 +1,16 @@
 /*
-* Tencent is pleased to support the open source community by making Mars available.
-* Copyright (C) 2016 THL A29 Limited, a Tencent company. All rights reserved.
-*
-* Licensed under the MIT License (the "License"); you may not use this file except in 
-* compliance with the License. You may obtain a copy of the License at
-* http://opensource.org/licenses/MIT
-*
-* Unless required by applicable law or agreed to in writing, software distributed under the License is
-* distributed on an "AS IS" basis, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-* either express or implied. See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Tencent is pleased to support the open source community by making Mars available.
+ * Copyright (C) 2016 THL A29 Limited, a Tencent company. All rights reserved.
+ *
+ * Licensed under the MIT License (the "License"); you may not use this file except in
+ * compliance with the License. You may obtain a copy of the License at
+ * http://opensource.org/licenses/MIT
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is
+ * distributed on an "AS IS" basis, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+ * either express or implied. See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package com.tencent.mars.sample;
 
@@ -33,20 +33,20 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import com.tencent.mars.sample.utils.Constants;
+import com.tencent.mars.sample.utils.print.BaseConstants;
+import com.tencent.mars.xlog.Log;
 import com.tencent.mars.sample.chat.ChatActivity;
 import com.tencent.mars.sample.core.MainService;
 import com.tencent.mars.sample.proto.Main;
+import com.tencent.mars.sample.service.IMService;
 import com.tencent.mars.sample.statistic.ReportDisplayActivity;
-import com.tencent.mars.sample.utils.Constants;
-import com.tencent.mars.sample.utils.print.BaseConstants;
 import com.tencent.mars.sample.wrapper.remote.MarsServiceProxy;
-import com.tencent.mars.sample.wrapper.remote.NanoMarsTaskWrapper;
-import com.tencent.mars.xlog.Log;
 
-import java.util.LinkedList;
-import java.util.List;
-
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.schedulers.Schedulers;
 import utils.bindsimple.BindSimple;
 import utils.bindsimple.BindView;
 
@@ -54,9 +54,7 @@ public class ConversationActivity extends AppCompatActivity {
 
     private static final String TAG = "Mars.Sample.ConversationActivity";
 
-    private static final String CONVERSATION_HOST = "marsopen.cn"; // using preset ports
-
-    private int conversationFilterType = Main.ConversationListRequest.DEFAULT;
+    private int conversationFilterType = Main.ConversationListRequest.FilterType.DEFAULT_VALUE;
 
     @BindView(R.id.conversation_list)
     RecyclerView conversationListView;
@@ -122,11 +120,11 @@ public class ConversationActivity extends AppCompatActivity {
         });
 
         final MainService mainService = new MainService();
-        MarsServiceProxy.setOnPushMessageListener(BaseConstants.CGIHISTORY_CMDID, mainService);
-        MarsServiceProxy.setOnPushMessageListener(BaseConstants.CONNSTATUS_CMDID, mainService);
-        MarsServiceProxy.setOnPushMessageListener(BaseConstants.FLOW_CMDID, mainService);
-        MarsServiceProxy.setOnPushMessageListener(BaseConstants.PUSHMSG_CMDID, mainService);
-        MarsServiceProxy.setOnPushMessageListener(BaseConstants.SDTRESULT_CMDID, mainService);
+        MarsServiceProxy.instance().setOnPushMessageListener(BaseConstants.CGIHISTORY_CMDID, mainService);
+        MarsServiceProxy.instance().setOnPushMessageListener(BaseConstants.CONNSTATUS_CMDID, mainService);
+        MarsServiceProxy.instance().setOnPushMessageListener(BaseConstants.FLOW_CMDID, mainService);
+        MarsServiceProxy.instance().setOnPushMessageListener(BaseConstants.PUSHMSG_CMDID, mainService);
+        MarsServiceProxy.instance().setOnPushMessageListener(BaseConstants.SDTRESULT_CMDID, mainService);
 
         initTopics();
 
@@ -147,13 +145,13 @@ public class ConversationActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        MarsServiceProxy.inst.setForeground(false);
+        MarsServiceProxy.instance().setForeground(false);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        MarsServiceProxy.inst.setForeground(true);
+        MarsServiceProxy.instance().setForeground(true);
     }
 
     private void initTopics() {
@@ -183,71 +181,35 @@ public class ConversationActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 
-    private NanoMarsTaskWrapper<Main.ConversationListRequest, Main.ConversationListResponse> taskGetConvList = null;
-
     /**
      * pull conversation list from server.
      */
     private void updateConversationTopics() {
-        if (taskGetConvList != null) {
-            MarsServiceProxy.cancel(taskGetConvList);
-        }
-
         textView.setVisibility(View.INVISIBLE);
         progressBar.setVisibility(View.VISIBLE);
 
         swipeRefreshLayout.setRefreshing(true);
 
-        taskGetConvList = new NanoMarsTaskWrapper<Main.ConversationListRequest, Main.ConversationListResponse>(
-                new Main.ConversationListRequest(),
-                new Main.ConversationListResponse()
-        ) {
+        IMService.getConvList(conversationFilterType)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(dataList -> {
+                    if (!dataList.isEmpty()) {
+                        progressBar.setVisibility(View.INVISIBLE);
+                        conversationListAdapter.list.clear();
+                        conversationListAdapter.list.addAll(dataList);
+                        conversationListAdapter.notifyDataSetChanged();
 
-            private List<Conversation> dataList = new LinkedList<>();
+                        swipeRefreshLayout.setRefreshing(false);
 
-            @Override
-            public void onPreEncode(Main.ConversationListRequest req) {
-                req.type = conversationFilterType;
-                req.accessToken = ""; // TODO:
-            }
-
-            @Override
-            public void onPostDecode(Main.ConversationListResponse response) {
-
-            }
-
-            @Override
-            public void onTaskEnd(int errType, int errCode) {
-                runOnUiThread(new Runnable() {
-
-                    @Override
-                    public void run() {
-                        if (response != null) {
-                            for (Main.Conversation conv : response.list) {
-                                dataList.add(new Conversation(conv.name, conv.topic, conv.notice));
-                            }
-                        }
-
-                        if (!dataList.isEmpty()) {
-                            progressBar.setVisibility(View.INVISIBLE);
-                            conversationListAdapter.list.clear();
-                            conversationListAdapter.list.addAll(dataList);
-                            conversationListAdapter.notifyDataSetChanged();
-
-                            swipeRefreshLayout.setRefreshing(false);
-
-                        } else {
-                            Log.i(TAG, "getconvlist: empty response list");
-                            progressBar.setVisibility(View.INVISIBLE);
-                            textView.setVisibility(View.VISIBLE);
-                        }
+                    } else {
+                        Log.i(TAG, "getconvlist: empty response list");
+                        progressBar.setVisibility(View.INVISIBLE);
+                        textView.setVisibility(View.VISIBLE);
                     }
+                }, t -> {
+                    Toast.makeText(this, t.getMessage(), Toast.LENGTH_LONG).show();
                 });
-            }
-
-        };
-
-        MarsServiceProxy.send(taskGetConvList.setHttpRequest(CONVERSATION_HOST, "/mars/getconvlist"));
     }
 
     private void checkPermission() {
@@ -268,7 +230,7 @@ public class ConversationActivity extends AppCompatActivity {
         switch (requestCode) {
             case Constants.STORAGE_REQUESTCODE:
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                  //  SampleApplicaton.openXlog();
+                    //  SampleApplicaton.openXlog();
 
                 } else {
                     //

@@ -832,7 +832,7 @@ void appender_open(TAppenderMode _mode, const char* _dir, const char* _nameprefi
     boost::filesystem::create_directories(_dir);
     tickcount_t tick;
     tick.gettickcount();
-    Thread(boost::bind(&__del_timeout_file, _dir)).start_after(2 * 60 * 1000);
+    Thread(boost::bind(&__del_timeout_file, _dir)).startAfter(2 * 60 * 1000);
     
     tick.gettickcount();
 
@@ -924,9 +924,9 @@ void appender_open_with_cache(TAppenderMode _mode, const std::string& _cachedir,
         sg_cache_logdir = _cachedir;
         boost::filesystem::create_directories(_cachedir);
 
-        Thread(boost::bind(&__del_timeout_file, _cachedir)).start_after(2 * 60 * 1000);
+        Thread(boost::bind(&__del_timeout_file, _cachedir)).startAfter(2 * 60 * 1000);
         // "_nameprefix" must explicitly convert to "std::string", or when the thread is ready to run, "_nameprefix" has been released.
-        Thread(boost::bind(&__move_old_files, _cachedir, _logdir, std::string(_nameprefix))).start_after(3 * 60 * 1000);
+        Thread(boost::bind(&__move_old_files, _cachedir, _logdir, std::string(_nameprefix))).startAfter(3 * 60 * 1000);
     }
 
 #ifdef __APPLE__
@@ -971,7 +971,7 @@ void appender_close() {
 
     sg_cond_buffer_async.notifyAll();
 
-    if (sg_thread_async.isruning())
+    if (sg_thread_async.isRunning())
         sg_thread_async.join();
 
     
@@ -997,7 +997,7 @@ void appender_setmode(TAppenderMode _mode) {
 
     sg_cond_buffer_async.notifyAll();
 
-    if (kAppednerAsync == sg_mode && !sg_thread_async.isruning()) {
+    if (kAppednerAsync == sg_mode && !sg_thread_async.isRunning()) {
         sg_thread_async.start();
     }
 }

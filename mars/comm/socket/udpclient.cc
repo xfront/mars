@@ -58,7 +58,7 @@ UdpClient::UdpClient(const std::string& _ip, int _port, IAsyncUdpClientEvent* _e
 
 UdpClient::~UdpClient()
 {
-    if (thread_ && thread_->isruning())
+    if (thread_ && thread_->isRunning())
     {
         event_ = NULL;
         breaker_.Break();
@@ -110,7 +110,7 @@ void UdpClient::SendAsync(void* _buf, size_t _len)
     list_buffer_.push_back(UdpSendData());
     list_buffer_.back().data.Write(_buf, _len);
     
-    if (!thread_->isruning())
+    if (!thread_->isRunning())
         thread_->start();
     breaker_.Break();
 }

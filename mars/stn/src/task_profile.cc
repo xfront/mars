@@ -27,47 +27,49 @@
 namespace mars {
 namespace stn {
 
-void __SetLastFailedStatus(std::list<TaskProfile>::iterator _it){
-    if (_it->remain_retry_count > 0) {
-        _it->last_failed_dyntime_status = _it->current_dyntime_status;
+void __SetLastFailedStatus(std::list<TaskProfile>::iterator it) {
+    if (it->remainRetryCount > 0) {
+        it->lastFailedDyntimeStatus = it->currentDyntimeStatus;
     }
 }
 
- uint64_t __ReadWriteTimeout(uint64_t  _first_pkg_timeout) {
+uint64_t __ReadWriteTimeout(uint64_t _first_pkg_timeout) {
     uint64_t rate = (kMobile != getNetInfo()) ? kWifiMinRate : kGPRSMinRate;
-    return  _first_pkg_timeout + 1000 * kMaxRecvLen / rate;
+    return _first_pkg_timeout + 1000 * kMaxRecvLen / rate;
 }
 
-uint64_t  __FirstPkgTimeout(int64_t  _init_first_pkg_timeout, size_t _sendlen, int _send_count, int _dynamictimeout_status) {
-    xassert2(3600 * 1000 >= _init_first_pkg_timeout, TSF"server_cost:%_ ", _init_first_pkg_timeout);
-    
+uint64_t
+__FirstPkgTimeout(int64_t initFirstPkgTimeout, size_t sendLen, int sendCount, int dynamicTimeoutStatus) {
+    xassert2(3600 * 1000 >= initFirstPkgTimeout, TSF"server_cost:%_ ", initFirstPkgTimeout);
+
     uint64_t ret = 0;
     uint64_t task_delay = (kMobile != getNetInfo()) ? kWifiTaskDelay : kGPRSTaskDelay;
-    
-    if (_dynamictimeout_status == kExcellent && _init_first_pkg_timeout == 0) {
+
+    if (dynamicTimeoutStatus == kExcellent && initFirstPkgTimeout == 0) {
         ret = (kMobile != getNetInfo()) ? kDynTimeFirstPackageWifiTimeout : kDynTimeFirstPackageGPRSTimeout;
-        ret += _send_count * task_delay;
-    }
-    else{
+        ret += sendCount * task_delay;
+    } else {
         uint64_t rate = (kMobile != getNetInfo()) ? kWifiMinRate : kGPRSMinRate;
-        uint64_t base_rw_timeout = (kMobile != getNetInfo()) ? kBaseFirstPackageWifiTimeout : kBaseFirstPackageGPRSTimeout;
+        uint64_t base_rw_timeout = (kMobile != getNetInfo()) ? kBaseFirstPackageWifiTimeout
+                                                             : kBaseFirstPackageGPRSTimeout;
         uint64_t max_rw_timeout = (kMobile != getNetInfo()) ? kMaxFirstPackageWifiTimeout : kMaxFirstPackageGPRSTimeout;
-        
-        if (0 < _init_first_pkg_timeout) {
-            ret = _init_first_pkg_timeout + 1000 * _sendlen / rate;
+
+        if (0 < initFirstPkgTimeout) {
+            ret = initFirstPkgTimeout + 1000 * sendLen / rate;
         } else {
-            ret =     base_rw_timeout + 1000 * _sendlen / rate;
+            ret = base_rw_timeout + 1000 * sendLen / rate;
             ret = ret < max_rw_timeout ? ret : max_rw_timeout;
         }
-        
-        ret += _send_count * task_delay;
+
+        ret += sendCount * task_delay;
     }
-    
+
     return ret;
 }
 
-bool __CompareTask(const TaskProfile& _first, const TaskProfile& _second) {
+bool __CompareTask(const TaskProfile &_first, const TaskProfile &_second) {
     return _first.task.priority < _second.task.priority;
 }
 
-}}
+}
+}

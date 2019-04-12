@@ -56,7 +56,7 @@ void SetClientVersion(uint32_t _client_version)  {
 }
 
 
-static int __unpack_test(const void* _packed, size_t _packed_len, uint32_t& _cmdid, uint32_t& _seq, size_t& _package_len, size_t& _body_len) {
+static int __unpack_test(const void* _packed, size_t _packed_len, uint32_t& cmdId, uint32_t& _seq, size_t& _package_len, size_t& _body_len) {
     __STNetMsgXpHeader st = {0};
     if (_packed_len < sizeof(__STNetMsgXpHeader)) {
         _package_len = 0;
@@ -73,7 +73,7 @@ static int __unpack_test(const void* _packed, size_t _packed_len, uint32_t& _cmd
         _body_len = 0;
     	return LONGLINK_UNPACK_FALSE;
     }
-    _cmdid = ntohl(st.cmdid);
+    cmdId = ntohl(st.cmdid);
 	_seq = ntohl(st.seq);
 	_body_len = ntohl(st.body_length);
 	_package_len = head_len + _body_len;
@@ -84,32 +84,32 @@ static int __unpack_test(const void* _packed, size_t _packed_len, uint32_t& _cmd
     return LONGLINK_UNPACK_OK;
 }
 
-void (*longlink_pack)(uint32_t _cmdid, uint32_t _seq, const AutoBuffer& _body, const AutoBuffer& _extension, AutoBuffer& _packed, longlink_tracker* _tracker)
-= [](uint32_t _cmdid, uint32_t _seq, const AutoBuffer& _body, const AutoBuffer& _extension, AutoBuffer& _packed, longlink_tracker* _tracker) {
+void (*longlink_pack)(uint32_t cmdId, uint32_t _seq, const AutoBuffer& body, const AutoBuffer& extension, AutoBuffer& _packed, longlink_tracker* _tracker)
+= [](uint32_t cmdId, uint32_t _seq, const AutoBuffer& body, const AutoBuffer& extension, AutoBuffer& _packed, longlink_tracker* _tracker) {
     __STNetMsgXpHeader st = {0};
     st.head_length = htonl(sizeof(__STNetMsgXpHeader));
     st.client_version = htonl(sg_client_version);
-    st.cmdid = htonl(_cmdid);
+    st.cmdid = htonl(cmdId);
     st.seq = htonl(_seq);
-    st.body_length = htonl(_body.Length());
+    st.body_length = htonl(body.Length());
 
-    _packed.AllocWrite(sizeof(__STNetMsgXpHeader) + _body.Length());
+    _packed.AllocWrite(sizeof(__STNetMsgXpHeader) + body.Length());
     _packed.Write(&st, sizeof(st));
     
-    if (NULL != _body.Ptr()) _packed.Write(_body.Ptr(), _body.Length());
+    if (NULL != body.Ptr()) _packed.Write(body.Ptr(), body.Length());
     
     _packed.Seek(0, AutoBuffer::ESeekStart);
 };
 
 
-int (*longlink_unpack)(const AutoBuffer& _packed, uint32_t& _cmdid, uint32_t& _seq, size_t& _package_len, AutoBuffer& _body, AutoBuffer& _extension, longlink_tracker* _tracker)
-= [](const AutoBuffer& _packed, uint32_t& _cmdid, uint32_t& _seq, size_t& _package_len, AutoBuffer& _body, AutoBuffer& _extension, longlink_tracker* _tracker) {
+int (*longlink_unpack)(const AutoBuffer& _packed, uint32_t& cmdId, uint32_t& _seq, size_t& _package_len, AutoBuffer& body, AutoBuffer& extension, longlink_tracker* _tracker)
+= [](const AutoBuffer& _packed, uint32_t& cmdId, uint32_t& _seq, size_t& _package_len, AutoBuffer& body, AutoBuffer& extension, longlink_tracker* _tracker) {
    size_t body_len = 0;
-   int ret = __unpack_test(_packed.Ptr(), _packed.Length(), _cmdid,  _seq, _package_len, body_len);
+   int ret = __unpack_test(_packed.Ptr(), _packed.Length(), cmdId,  _seq, _package_len, body_len);
     
     if (LONGLINK_UNPACK_OK != ret) return ret;
     
-    _body.Write(AutoBuffer::ESeekCur, _packed.Ptr(_package_len-body_len), body_len);
+    body.Write(AutoBuffer::ESeekCur, _packed.Ptr(_package_len-body_len), body_len);
     
     return ret;
 };
@@ -124,9 +124,9 @@ uint32_t (*longlink_noop_cmdid)()
     return NOOP_CMDID;
 };
 
-bool  (*longlink_noop_isresp)(uint32_t _taskid, uint32_t _cmdid, uint32_t _recv_seq, const AutoBuffer& _body, const AutoBuffer& _extend)
-= [](uint32_t _taskid, uint32_t _cmdid, uint32_t _recv_seq, const AutoBuffer& _body, const AutoBuffer& _extend) {
-    return Task::kNoopTaskID == _taskid && NOOP_CMDID == _cmdid;
+bool  (*longlink_noop_isresp)(uint32_t taskId, uint32_t cmdId, uint32_t _recv_seq, const AutoBuffer& body, const AutoBuffer& bufExt)
+= [](uint32_t taskId, uint32_t cmdId, uint32_t _recv_seq, const AutoBuffer& body, const AutoBuffer& bufExt) {
+    return Task::kNoopTaskID == taskId && NOOP_CMDID == cmdId;
 };
 
 uint32_t (*signal_keep_cmdid)()
@@ -134,13 +134,13 @@ uint32_t (*signal_keep_cmdid)()
     return SIGNALKEEP_CMDID;
 };
 
-void (*longlink_noop_req_body)(AutoBuffer& _body, AutoBuffer& _extend)
-= [](AutoBuffer& _body, AutoBuffer& _extend) {
+void (*longlink_noop_req_body)(AutoBuffer& body, AutoBuffer& bufExt)
+= [](AutoBuffer& body, AutoBuffer& bufExt) {
     
 };
     
-void (*longlink_noop_resp_body)(const AutoBuffer& _body, const AutoBuffer& _extend)
-= [](const AutoBuffer& _body, const AutoBuffer& _extend) {
+void (*longlink_noop_resp_body)(const AutoBuffer& body, const AutoBuffer& bufExt)
+= [](const AutoBuffer& body, const AutoBuffer& bufExt) {
     
 };
 
@@ -154,13 +154,13 @@ bool (*longlink_complexconnect_need_verify)()
     return false;
 };
 
-bool (*longlink_ispush)(uint32_t _cmdid, uint32_t _taskid, const AutoBuffer& _body, const AutoBuffer& _extend)
-= [](uint32_t _cmdid, uint32_t _taskid, const AutoBuffer& _body, const AutoBuffer& _extend) {
-    return PUSH_DATA_TASKID == _taskid;
+bool (*longlink_ispush)(uint32_t cmdId, uint32_t taskId, const AutoBuffer& body, const AutoBuffer& bufExt)
+= [](uint32_t cmdId, uint32_t taskId, const AutoBuffer& body, const AutoBuffer& bufExt) {
+    return PUSH_DATA_TASKID == taskId;
 };
     
-bool (*longlink_identify_isresp)(uint32_t _sent_seq, uint32_t _cmdid, uint32_t _recv_seq, const AutoBuffer& _body, const AutoBuffer& _extend)
-= [](uint32_t _sent_seq, uint32_t _cmdid, uint32_t _recv_seq, const AutoBuffer& _body, const AutoBuffer& _extend) {
+bool (*longlink_identify_isresp)(uint32_t _sent_seq, uint32_t cmdId, uint32_t _recv_seq, const AutoBuffer& body, const AutoBuffer& bufExt)
+= [](uint32_t _sent_seq, uint32_t cmdId, uint32_t _recv_seq, const AutoBuffer& body, const AutoBuffer& bufExt) {
     return _sent_seq == _recv_seq && 0 != _sent_seq;
 };
 

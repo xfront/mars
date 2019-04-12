@@ -28,59 +28,56 @@
 using namespace mars::stn;
 
 LongLinkIdentifyChecker::LongLinkIdentifyChecker()
-:has_checked_(false)
-, cmd_id_(0)
-, taskid_(0)
-{ }
+        : mHasChecked(false)
+        , mCmdId(0)
+        , mTaskId(0) {
 
-LongLinkIdentifyChecker::~LongLinkIdentifyChecker() { }
+}
 
-bool LongLinkIdentifyChecker::GetIdentifyBuffer(AutoBuffer &_buffer, uint32_t &_cmdid)
-{
-    if (has_checked_) return false;
-    
-    hash_code_buffer_.Reset();
-    _buffer.Reset();
+LongLinkIdentifyChecker::~LongLinkIdentifyChecker() {}
 
-    IdentifyMode mode = (IdentifyMode)GetLonglinkIdentifyCheckBuffer(_buffer, hash_code_buffer_, (int&)_cmdid);
+bool LongLinkIdentifyChecker::GetIdentifyBuffer(AutoBuffer &buffer, uint32_t &cmdId) {
+    if (mHasChecked) return false;
 
-    switch (mode)
-    {
-    case kCheckNever:
-        {
-            has_checked_ = true;
+    mHashCodeBuffer.Reset();
+    buffer.Reset();
+
+    IdentifyMode mode = (IdentifyMode) GetLonglinkIdentifyCheckBuffer(buffer, mHashCodeBuffer, (int &) cmdId);
+
+    switch (mode) {
+        case kCheckNever: {
+            mHasChecked = true;
         }
-        break;
-    case kCheckNext:
-        {
-            has_checked_ = false;
+            break;
+        case kCheckNext: {
+            mHasChecked = false;
         }
-        break;
-    case kCheckNow:
-        {
-            cmd_id_ = _cmdid;
+            break;
+        case kCheckNow: {
+            mCmdId = cmdId;
             return true;
         }
-        break;
-    default:
-        xassert2(false);
+            break;
+        default:
+            xassert2(false);
     }
-    
+
     return false;
 }
 
-void LongLinkIdentifyChecker::SetID(uint32_t  _taskid) { taskid_ = _taskid;}
+void LongLinkIdentifyChecker::SetID(uint32_t taskId) { mTaskId = taskId; }
 
-bool LongLinkIdentifyChecker::IsIdentifyResp(uint32_t _cmdid, uint32_t _taskid, const AutoBuffer& _buffer, const AutoBuffer& _extend) const {
-    return longlink_identify_isresp(taskid_, _cmdid, _taskid, _buffer, _extend);
+bool LongLinkIdentifyChecker::IsIdentifyResp(uint32_t cmdId, uint32_t taskId, const AutoBuffer &buffer,
+                                             const AutoBuffer &bufExt) const {
+    return longlink_identify_isresp(mTaskId, cmdId, taskId, buffer, bufExt);
 }
 
-bool LongLinkIdentifyChecker::OnIdentifyResp(AutoBuffer& _buffer) {
+bool LongLinkIdentifyChecker::OnIdentifyResp(AutoBuffer &buffer) {
     xinfo2(TSF"identifycheck(synccheck) resp");
-    bool ret = ::OnLonglinkIdentifyResponse(_buffer, hash_code_buffer_);
-    taskid_ = 0;
+    bool ret = ::OnLonglinkIdentifyResponse(buffer, mHashCodeBuffer);
+    mTaskId = 0;
     if (ret) {
-        has_checked_ = true;
+        mHasChecked = true;
         return true;
     }
     return false;
@@ -88,8 +85,8 @@ bool LongLinkIdentifyChecker::OnIdentifyResp(AutoBuffer& _buffer) {
 
 
 void LongLinkIdentifyChecker::Reset() {
-    has_checked_ = false;
-    taskid_ = 0;
-    cmd_id_ = 0;
-    hash_code_buffer_.Reset();
+    mHasChecked = false;
+    mTaskId = 0;
+    mCmdId = 0;
+    mHashCodeBuffer.Reset();
 }

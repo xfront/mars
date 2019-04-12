@@ -37,93 +37,113 @@
 class ActiveLogic;
 
 namespace mars {
-    namespace stn {
+namespace stn {
 
 struct IPPortItem;
 
 class NetSource {
-  public:
+public:
     class DnsUtil {
     public:
-    	DnsUtil();
-        ~DnsUtil();
-        
-    public:
-        DNS& GetNewDNS() {	return new_dns_;}
-        DNS& GetDNS() {	return dns_;}
+        DnsUtil();
 
-        void Cancel(const std::string& host = "");
-        
+        ~DnsUtil();
+
+    public:
+        DNS &GetNewDNS() { return mNewDns; }
+
+        DNS &GetDNS() { return mDns; }
+
+        void Cancel(const std::string &host = "");
+
     private:
-        DnsUtil(const DnsUtil&);
-        DnsUtil& operator=(const DnsUtil&);
-        
+        DnsUtil(const DnsUtil &);
+
+        DnsUtil &operator=(const DnsUtil &);
+
     private:
-        DNS new_dns_;
-        DNS dns_;
+        DNS mNewDns;
+        DNS mDns;
     };
 
-  public:
+public:
     //set longlink host and ports
-    static void SetLongLink(const std::vector<std::string>& _hosts, const std::vector<uint16_t>& _ports, const std::string& _debugip);
+    static void SetLongLink(const std::vector<std::string> &hosts, const std::vector<uint16_t> &ports,
+                            const std::string &debugIp);
+
     //set shortlink port
-    static void SetShortlink(const uint16_t _port, const std::string& _debugip);
+    static void SetShortlink(const uint16_t port, const std::string &debugIp);
+
     //set backup ips for host, these ips would be used when host dns failed
-    static void SetBackupIPs(const std::string& _host, const std::vector<std::string>& _ips);
+    static void SetBackupIPs(const std::string &host, const std::vector<std::string> &ipList);
+
     //set debug ip
-    static void SetDebugIP(const std::string& _host, const std::string& _ip);
-    static const std::string& GetLongLinkDebugIP();
-    static const std::string& GetShortLinkDebugIP();
-    
-    static void SetLowPriorityLonglinkPorts(const std::vector<uint16_t>& _lowpriority_longlink_ports);
+    static void SetDebugIP(const std::string &host, const std::string &ip);
 
-    static void GetLonglinkPorts(std::vector<uint16_t>& _ports);
-    static const std::vector<std::string>& GetLongLinkHosts();
+    static const std::string &GetLongLinkDebugIP();
+
+    static const std::string &GetShortLinkDebugIP();
+
+    static void SetLowPriorityLonglinkPorts(const std::vector<uint16_t> &lowPriorityLonglinkPorts);
+
+    static void GetLonglinkPorts(std::vector<uint16_t> &ports);
+
+    static const std::vector<std::string> &GetLongLinkHosts();
+
     static uint16_t GetShortLinkPort();
-    
-    static void GetBackupIPs(std::string _host, std::vector<std::string>& _iplist);
 
-    static std::string DumpTable(const std::vector<IPPortItem>& _ipport_items);
-    
-  public:
-    NetSource(ActiveLogic& _active_logic);
+    static void GetBackupIPs(std::string const& host, std::vector<std::string> &ipList);
+
+    static std::string DumpTable(const std::vector<IPPortItem> &ipPortList);
+
+public:
+    NetSource(ActiveLogic &activeLogic);
+
     ~NetSource();
 
-  public:
+public:
     // for long link
-    bool GetLongLinkItems(std::vector<IPPortItem>& _ipport_items, DnsUtil& _dns_util);
+    bool GetLongLinkItems(std::vector<IPPortItem> &ipPortList, DnsUtil &dnsUtil);
 
     // for short link
-    bool GetShortLinkItems(const std::vector<std::string>& _hostlist, std::vector<IPPortItem>& _ipport_items, DnsUtil& _dns_util);
+    bool GetShortLinkItems(const std::vector<std::string> &hostList, std::vector<IPPortItem> &ipPortList,
+                           DnsUtil &dnsUtil);
 
-    void AddServerBan(const std::string& _ip);
-    
+    void AddServerBan(const std::string &ip);
+
     void ClearCache();
 
-    void ReportLongIP(bool _is_success, const std::string& _ip, uint16_t _port);
-    void ReportShortIP(bool _is_success, const std::string& _ip, const std::string& _host, uint16_t _port);
+    void ReportLongIP(bool isSuccess, const std::string &ip, uint16_t port);
 
-    void RemoveLongBanIP(const std::string& _ip);
+    void ReportShortIP(bool isSuccess, const std::string &ip, const std::string &host, uint16_t port);
 
-    bool GetLongLinkSpeedTestIPs(std::vector<IPPortItem>& _ip_vec);
-    void ReportLongLinkSpeedTestResult(std::vector<IPPortItem>& _ip_vec);
+    void RemoveLongBanIP(const std::string &ip);
 
-  private:
-    
-    bool __HasShortLinkDebugIP(const std::vector<std::string>& _hostlist);
-    
-    bool __GetLonglinkDebugIPPort(std::vector<IPPortItem>& _ipport_items);
-    bool __GetShortlinkDebugIPPort(const std::vector<std::string>& _hostlist, std::vector<IPPortItem>& _ipport_items);
+    bool GetLongLinkSpeedTestIPs(std::vector<IPPortItem> &ipPortList);
 
-    void __GetIPPortItems(std::vector<IPPortItem>& _ipport_items, const std::vector<std::string>& _hostlist, DnsUtil& _dns_util, bool _islonglink);
-    size_t __MakeIPPorts(std::vector<IPPortItem>& _ip_items, const std::string& _host, size_t _count, DnsUtil& _dns_util, bool _isbackup, bool _islonglink);
+    void ReportLongLinkSpeedTestResult(std::vector<IPPortItem> &ipPortList);
 
-  private:
-    ActiveLogic&        active_logic_;
-    SimpleIPPortSort    ipportstrategy_;
+private:
+
+    bool __HasShortLinkDebugIP(const std::vector<std::string> &hostList);
+
+    bool __GetLonglinkDebugIPPort(std::vector<IPPortItem> &ipPortList);
+
+    bool __GetShortlinkDebugIPPort(const std::vector<std::string> &hostList, std::vector<IPPortItem> &ipPortList);
+
+    void __GetIPPortItems(std::vector<IPPortItem> &ipPortList, const std::vector<std::string> &hostList,
+                          DnsUtil &dnsUtil, bool isLongLink);
+
+    size_t
+    __MakeIPPorts(std::vector<IPPortItem> &_ip_items, const std::string &host, size_t _count, DnsUtil &dnsUtil,
+                  bool isBackup, bool isLongLink);
+
+private:
+    ActiveLogic &mActiveLogic;
+    SimpleIPPortSort mIpPortStrategy;
 };
-        
-    }
+
+}
 }
 
 

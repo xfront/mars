@@ -27,22 +27,29 @@
 #include "mars/comm/thread/lock.h"
 
 class NetCheckTrafficMonitor {
-  public:
-    NetCheckTrafficMonitor(unsigned long mobileDataThreshold, bool isIgnoreRecvData = true, unsigned long wifiDataThreshold = ULONG_MAX);
+public:
+    NetCheckTrafficMonitor(unsigned long mobileDataThreshold, bool isIgnoreRecvData = true,
+                           unsigned long wifiDataThreshold = ULONG_MAX);
+
     ~NetCheckTrafficMonitor();
+
     bool sendLimitCheck(unsigned long sendDataSize);
+
     bool recvLimitCheck(unsigned long recvDataSize);
+
     void reset();
 
-  private:
+private:
     int __data(unsigned long sendDataSize, unsigned long recvDataSize);
+
     void __dumpDataSize();
 
-  private:
-    NetCheckTrafficMonitor(const NetCheckTrafficMonitor&);
-    NetCheckTrafficMonitor& operator=(const NetCheckTrafficMonitor&);
+private:
+    NetCheckTrafficMonitor(const NetCheckTrafficMonitor &);
 
-  private:
+    NetCheckTrafficMonitor &operator=(const NetCheckTrafficMonitor &);
+
+private:
     unsigned long wifi_recv_data_size_;
     unsigned long wifi_send_data_size_;
     unsigned long mobile_recv_data_size_;
@@ -52,7 +59,6 @@ class NetCheckTrafficMonitor {
     bool is_ignore_recv_data_;
     Mutex mutex_;
 };
-
 
 
 #endif /* NETCHECKTRAFFICMONITOR_H_ */

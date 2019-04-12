@@ -742,13 +742,13 @@ static void __ANRCheckCallback(bool _iOS_style, const mars::comm::check_content&
     xinfo2(TSF"anr check content:%_, handler:(%_,%_)", _content.call_id, mq_id.queue, mq_id.seq);
     
     boost::shared_ptr<Thread> thread(new Thread(boost::bind(__ANRAssert, _iOS_style, _content, mq_id)));
-    thread->start_after(kWaitANRTimeout);
+    thread->startAfter(kWaitANRTimeout);
     
     MessageQueue::AsyncInvoke([=]() {
-        if (thread->isruning()) {
+        if (thread->isRunning()) {
             xinfo2(TSF"misjudge anr, timeout:%_, tid:%_, runing time:%_, real time:%_, used_cpu_time:%_, handler:(%_,%_)", _content.timeout,
                    _content.tid, clock_app_monotonic() - _content.start_time, gettickcount() - _content.start_tickcount, _content.used_cpu_time, mq_id.queue, mq_id.seq);
-            thread->cancel_after();
+            thread->cancelAfter();
         }
     }, MessageQueue::DefAsyncInvokeHandler(mq_id.queue), "__ANRCheckCallback");
 }
@@ -923,7 +923,7 @@ MessageQueue_t MessageQueueCreater::GetMessageQueue() {
 MessageQueue_t MessageQueueCreater::CreateMessageQueue() {
     ScopedLock lock(messagequeue_mutex_);
 
-    if (thread_.isruning()) return messagequeue_id_;
+    if (thread_.isRunning()) return messagequeue_id_;
 
     if (0 != thread_.start()) { return KInvalidQueueID;}
     messagequeue_id_ = __CreateMessageQueueInfo(breaker_, thread_.tid());

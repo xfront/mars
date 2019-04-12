@@ -29,16 +29,18 @@ namespace mars {
 namespace sdt {
 
 class PingChecker : public BaseChecker {
-  public:
+public:
     PingChecker();
+
     virtual ~PingChecker();
 
-    virtual int StartDoCheck(CheckRequestProfile& _check_request);
+    virtual int StartDoCheck(CheckRequestProfile &_check_request);
 
-  protected:
-    virtual void __DoCheck(CheckRequestProfile& _check_request);
+protected:
+    virtual void __DoCheck(CheckRequestProfile &_check_request);
 };
 
-}}
+}
+}
 
-#endif	// SDT_SRC_ACTIVECHECK_PINGCHEKER_H_
+#endif    // SDT_SRC_ACTIVECHECK_PINGCHEKER_H_

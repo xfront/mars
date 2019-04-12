@@ -24,8 +24,8 @@
 #include "thread/runnable.h"
 
 
-#ifndef _WINRT_DLL   // for wp8 
-//#define USED_BOOST_THREAD_LIB   // else used vc11 std thread 
+#ifndef _WINRT_DLL   // for wp8
+//#define USED_BOOST_THREAD_LIB   // else used vc11 std thread
 #endif
 
 
@@ -75,7 +75,7 @@ class ThreadUtil {
 #endif
     }
 
-    static bool isruning(thread_tid /*_id*/);
+    static bool isRunning(thread_tid /*_id*/);
     //{
     //    ASSERT(false);
     //    return false;
@@ -115,7 +115,7 @@ class ThreadUtil {
     }
 
 	static void join (thread_tid _tid) {
-	
+
 #ifdef USED_BOOST_THREAD_LIB
 	#error "todo"
 #else
@@ -212,7 +212,7 @@ class Thread {
         bool iscanceldelaystart;
         Condition condtime;
         SpinLock splock;
-        bool isinthread; 
+        bool isinthread;
         int killsig;
     };
 
@@ -242,7 +242,7 @@ class Thread {
 
         if (_newone) *_newone = false;
 
-        if (isruning())return 0;
+        if (isRunning())return 0;
 
         m_runableref->isended = false;
 		m_runableref->isjoined = outside_join_;
@@ -268,7 +268,7 @@ class Thread {
 
         if (_newone) *_newone = false;
 
-        if (isruning())return 0;
+        if (isRunning())return 0;
 
         delete m_runableref->target;
         m_runableref->target = detail::transform(op);
@@ -291,10 +291,10 @@ class Thread {
         return ret;
     }
 
-    int start_after(unsigned int after) {
+    int startAfter(unsigned int after) {
         ScopedSpinLock lock(m_runableref->splock);
 
-        if (isruning())return 0;
+        if (isRunning())return 0;
 
         m_runableref->condtime.cancelAnyWayNotify();
         m_runableref->iscanceldelaystart = false;
@@ -316,19 +316,19 @@ class Thread {
         return ret;
     }
 
-    void cancel_after() {
+    void cancelAfter() {
         ScopedSpinLock lock(m_runableref->splock);
 
-        if (!isruning()) return;
+        if (!isRunning()) return;
 
         m_runableref->iscanceldelaystart = true;
         m_runableref->condtime.notifyAll(true);
     }
 
-    int start_periodic(unsigned int after, unsigned int periodic) { // ms
+    int startPeriodic(unsigned int after, unsigned int periodic) { // ms
         ScopedSpinLock lock(m_runableref->splock);
 
-        if (isruning()) return 0;
+        if (isRunning()) return 0;
 
         m_runableref->condtime.cancelAnyWayNotify();
         m_runableref->iscanceldelaystart = false;
@@ -352,10 +352,10 @@ class Thread {
         return ret;
     }
 
-    void cancel_periodic() {
+    void cancelPeriodic() {
         ScopedSpinLock lock(m_runableref->splock);
 
-        if (!isruning()) return;
+        if (!isRunning()) return;
 
         m_runableref->iscanceldelaystart = true;
         m_runableref->condtime.notifyAll(true);
@@ -365,7 +365,7 @@ class Thread {
         ScopedSpinLock lock(m_runableref->splock);
         ASSERT(!m_runableref->isjoined);
 
-        if (isruning()) {
+        if (isRunning()) {
             m_runableref->isjoined = true;
             lock.unlock();
             ThreadUtil::join(m_runableref->m_th);
@@ -383,7 +383,7 @@ class Thread {
         // return m_runableref->tid._Id;
     }
 
-    bool isruning() const {
+    bool isRunning() const {
         return !m_runableref->isended;
     }
 

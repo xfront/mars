@@ -29,8 +29,7 @@
  *  	 recv是目标服务器对该http请求的响应
  *  	 timeout为设置的查询超时时间，单位为ms
  */
-int SendHttpQuery(const std::string& _url, int& _status_code, std::string& _errmsg, int _timeout/*ms*/);
-
+int SendHttpQuery(const std::string &_url, int &_status_code, std::string &_errmsg, int _timeout/*ms*/);
 
 
 #endif /* SDT_SRC_CHECKIMPL_HTTPQUERY_H_ */

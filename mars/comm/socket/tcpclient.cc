@@ -85,7 +85,7 @@ void TcpClient::Disconnect() {
 void TcpClient::DisconnectAndWait() {
     Disconnect();
 
-    if (thread_.isruning())
+    if (thread_.isRunning())
         thread_.join();
 }
 

@@ -102,7 +102,7 @@ public:
 	}
 
 
-	static bool save_wording_to_ini(const char* _key, const char* _value, const char* _sectionName, const char* _iniFileName)
+	static bool save_wording_to_ini(const char* key, const char* value, const char* _sectionName, const char* _iniFileName)
 	{
 		INI ini(_iniFileName, false);
 		ini.Parse();
@@ -114,15 +114,15 @@ public:
 				return false;
 			}
 		}
-		ini.Set(_key, _value);
+		ini.Set(key, value);
 		ini.Save();
 		return true;
 	}
-	static  std::string get_wording_from_ini(const char* _key,const char* _sectionName, const char* _iniFileName)
+	static  std::string get_wording_from_ini(const char* key,const char* _sectionName, const char* _iniFileName)
 	{
 		INI ini(_iniFileName, false);
 		ini.Parse();
-		std::string value(ini.Get(_sectionName, _key, ""));
+		std::string value(ini.Get(_sectionName, key, ""));
 		return value;
 	}
 

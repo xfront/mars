@@ -32,60 +32,59 @@
 using namespace mars::stn;
 
 static const unsigned int kCmdIdOutOfBand = 72;
-static const int kTimeout = 10*1000;  // s
+static const int kTimeout = 10 * 1000;  // s
 
-LongLinkSpeedTestItem::LongLinkSpeedTestItem(const std::string& _ip, uint16_t _port)
-    : ip_(_ip)
-    , port_(_port)
-    , socket_(-1)
-    , state_(kLongLinkSpeedTestConnecting)
-    , before_connect_time_(0)
-    , after_connect_time_(0) {
-        
+LongLinkSpeedTestItem::LongLinkSpeedTestItem(const std::string &ip, uint16_t port)
+        : mIP(ip)
+        , mPort(port)
+        , mSocket(-1)
+        , mState(kLongLinkSpeedTestConnecting)
+        , mBeforeConnectTime(0)
+        , mAfterConnectTime(0) {
     AutoBuffer body;
     AutoBuffer extension;
     longlink_noop_req_body(body, extension);
 
-    longlink_pack(longlink_noop_cmdid(), Task::kNoopTaskID, body, extension, req_ab_, NULL);
-    req_ab_.Seek(0, AutoBuffer::ESeekStart);
+    longlink_pack(longlink_noop_cmdid(), Task::kNoopTaskID, body, extension, mReqBuf, NULL);
+    mReqBuf.Seek(0, AutoBuffer::ESeekStart);
 
-    socket_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    mSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
-    if (socket_ == INVALID_SOCKET) {
+    if (mSocket == INVALID_SOCKET) {
         xerror2(TSF"socket create error, errno:%0", strerror(errno));
         return;
     }
 
     // set the socket to unblocked model
-#ifdef _WIN32 
-    if (0 != socket_ipv6only(socket_, 0)){ xwarn2(TSF"set ipv6only failed. error %_",strerror(socket_errno)); }
+#ifdef _WIN32
+    if (0 != socket_ipv6only(mSocket, 0)){ xwarn2(TSF"set ipv6only failed. error %_",strerror(socket_errno)); }
 #endif
-        
-    int ret = socket_set_nobio(socket_);
+
+    int ret = socket_set_nobio(mSocket);
 
     if (ret != 0) {
         xerror2(TSF"nobio error");
-        ::socket_close(socket_);
-        socket_ = -1;
-        socket_ = -1;
+        ::socket_close(mSocket);
+        mSocket = -1;
+        mSocket = -1;
         return;
     }
 
-    if (::getNetInfo() == kWifi && socket_fix_tcp_mss(socket_) < 0) {
+    if (::getNetInfo() == kWifi && socket_fix_tcp_mss(mSocket) < 0) {
 #ifdef ANDROID
         xinfo2(TSF"wifi set tcp mss error:%0", strerror(socket_errno));
 #endif
     }
 
-    struct sockaddr_in _addr;
+    struct sockaddr_in addr;
 
-    bzero(&_addr, sizeof(_addr));
-    _addr = *(struct sockaddr_in*)(&socket_address(ip_.c_str(), port_).address());
+    bzero(&addr, sizeof(addr));
+    addr = *(struct sockaddr_in *) (&socket_address(mIP.c_str(), mPort).address());
 
-    before_connect_time_ = gettickcount();
+    mBeforeConnectTime = gettickcount();
 
-    if (0 !=::connect(socket_, (sockaddr*)&_addr, sizeof(_addr))) {
-        xerror2(TSF "connect fail");
+    if (0 != ::connect(mSocket, (sockaddr *) &addr, sizeof(addr))) {
+        xerror2(TSF"connect fail");
     }
 }
 
@@ -93,90 +92,90 @@ LongLinkSpeedTestItem::~LongLinkSpeedTestItem() {
     CloseSocket();
 }
 
-void LongLinkSpeedTestItem::HandleFDISSet(SocketSelect& _sel) {
+void LongLinkSpeedTestItem::HandleFDISSet(SocketSelect &_sel) {
     xverbose_function();
 
-    if (kLongLinkSpeedTestFail == state_ || kLongLinkSpeedTestSuc == state_) {
+    if (kLongLinkSpeedTestFail == mState || kLongLinkSpeedTestSuc == mState) {
         return;
     }
 
-    if (_sel.Exception_FD_ISSET(socket_)) {
+    if (_sel.Exception_FD_ISSET(mSocket)) {
         xerror2(TSF"the socket is error, error:%0", strerror(errno));
-        state_ = kLongLinkSpeedTestFail;
-    } else if (_sel.Write_FD_ISSET(socket_)) {
-        if (kLongLinkSpeedTestConnecting == state_) {
-            after_connect_time_ = gettickcount();
+        mState = kLongLinkSpeedTestFail;
+    } else if (_sel.Write_FD_ISSET(mSocket)) {
+        if (kLongLinkSpeedTestConnecting == mState) {
+            mAfterConnectTime = gettickcount();
         }
 
-        state_ = __HandleSpeedTestReq();
-    } else if (_sel.Read_FD_ISSET(socket_)) {
-        state_ = __HandleSpeedTestResp();
+        mState = __HandleSpeedTestReq();
+    } else if (_sel.Read_FD_ISSET(mSocket)) {
+        mState = __HandleSpeedTestResp();
     } else {
         // do nothing
     }
 }
 
-void LongLinkSpeedTestItem::HandleSetFD(SocketSelect& _sel) {
-    switch (state_) {
-    case kLongLinkSpeedTestConnecting:
-    case kLongLinkSpeedTestOOB:
-    case kLongLinkSpeedTestReq:
-        _sel.Write_FD_SET(socket_);
-        _sel.Read_FD_SET(socket_);
-        _sel.Exception_FD_SET(socket_);
-        break;
+void LongLinkSpeedTestItem::HandleSetFD(SocketSelect &_sel) {
+    switch (mState) {
+        case kLongLinkSpeedTestConnecting:
+        case kLongLinkSpeedTestOOB:
+        case kLongLinkSpeedTestReq:
+            _sel.Write_FD_SET(mSocket);
+            _sel.Read_FD_SET(mSocket);
+            _sel.Exception_FD_SET(mSocket);
+            break;
 
-    case kLongLinkSpeedTestResp:
-        _sel.Read_FD_SET(socket_);
-        _sel.Exception_FD_SET(socket_);
-        break;
+        case kLongLinkSpeedTestResp:
+            _sel.Read_FD_SET(mSocket);
+            _sel.Exception_FD_SET(mSocket);
+            break;
 
-    default:
-        xassert2(false);
-        break;
+        default:
+            xassert2(false);
+            break;
     }
 }
 
 int LongLinkSpeedTestItem::GetSocket() {
-    return socket_;
+    return mSocket;
 }
 
 std::string LongLinkSpeedTestItem::GetIP() {
-    return ip_;
+    return mIP;
 }
 
 unsigned int LongLinkSpeedTestItem::GetPort() {
-    return port_;
+    return mPort;
 }
 
 unsigned long LongLinkSpeedTestItem::GetConnectTime() {
-    return after_connect_time_ - before_connect_time_;
+    return mAfterConnectTime - mBeforeConnectTime;
 }
 
 int LongLinkSpeedTestItem::GetState() {
-    return state_;
+    return mState;
 }
 
 void LongLinkSpeedTestItem::CloseSocket() {
-    if (socket_ > 0) {
-        ::socket_close(socket_);
-        socket_ = -1;
-        socket_ = -1;
+    if (mSocket > 0) {
+        ::socket_close(mSocket);
+        mSocket = -1;
+        mSocket = -1;
     }
 }
 
 int LongLinkSpeedTestItem::__HandleSpeedTestReq() {
-    ssize_t nwrite =::send(socket_, req_ab_.PosPtr(), req_ab_.Length() - req_ab_.Pos(), 0);
+    ssize_t nwrite = ::send(mSocket, mReqBuf.PosPtr(), mReqBuf.Length() - mReqBuf.Pos(), 0);
 
     if (nwrite <= 0) {
         xerror2(TSF"writen send <= 0, errno:%0, nwrite:%1", strerror(errno), nwrite);
         return kLongLinkSpeedTestFail;
     } else {
         xdebug2(TSF"send length:%0", nwrite);
-        req_ab_.Seek(nwrite, AutoBuffer::ESeekCur);
+        mReqBuf.Seek(nwrite, AutoBuffer::ESeekCur);
 
-        if (req_ab_.Length() - req_ab_.Pos() <= 0) {
-            return  kLongLinkSpeedTestResp;
+        if (mReqBuf.Length() - mReqBuf.Pos() <= 0) {
+            return kLongLinkSpeedTestResp;
         } else {
             return kLongLinkSpeedTestReq;
         }
@@ -184,41 +183,42 @@ int LongLinkSpeedTestItem::__HandleSpeedTestReq() {
 }
 
 int LongLinkSpeedTestItem::__HandleSpeedTestResp() {
-    if (resp_ab_.Capacity() - resp_ab_.Pos() <= 0) {
-        resp_ab_.AddCapacity(resp_ab_.Capacity() == 0 ? 1024 : resp_ab_.Capacity());
+    if (mRspBuf.Capacity() - mRspBuf.Pos() <= 0) {
+        mRspBuf.AddCapacity(mRspBuf.Capacity() == 0 ? 1024 : mRspBuf.Capacity());
     }
 
-    ssize_t nrecv = recv(socket_, resp_ab_.PosPtr(), resp_ab_.Capacity() - resp_ab_.Pos(), 0);
+    ssize_t nrecv = recv(mSocket, mRspBuf.PosPtr(), mRspBuf.Capacity() - mRspBuf.Pos(), 0);
 
     if (nrecv <= 0) {
-        xerror2(TSF"recv nrecv <= 0, errno:%0, resp_ab_.Capacity():%1,resp_ab_.Pos():%2", strerror(errno), resp_ab_.Capacity(), resp_ab_.Pos());
+        xerror2(TSF"recv nrecv <= 0, errno:%0, mRspBuf.Capacity():%1,mRspBuf.Pos():%2", strerror(errno),
+                mRspBuf.Capacity(), mRspBuf.Pos());
         return kLongLinkSpeedTestFail;
     } else {
         xdebug2(TSF"recv length:%0", nrecv);
-        resp_ab_.Length(nrecv + resp_ab_.Pos(), resp_ab_.Length() + nrecv);
+        mRspBuf.Length(nrecv + mRspBuf.Pos(), mRspBuf.Length() + nrecv);
 
         size_t pacLength = 0;
         uint32_t anSeq = 0;
         uint32_t anCmdID = 0;
         AutoBuffer body;
         AutoBuffer extension;
-        
-        int nRet  = longlink_unpack(resp_ab_, anCmdID, anSeq, pacLength, body, extension, NULL);
+
+        int nRet = longlink_unpack(mRspBuf, anCmdID, anSeq, pacLength, body, extension, NULL);
 
         if (LONGLINK_UNPACK_FALSE == nRet) {
             xerror2(TSF"longlink_unpack false");
             return kLongLinkSpeedTestFail;
         } else if (LONGLINK_UNPACK_CONTINUE == nRet) {
-            xdebug2(TSF"not recv an package,continue recv, resp_ab_.Lenght():%0", resp_ab_.Length());
+            xdebug2(TSF"not recv an package,continue recv, mRspBuf.Lenght():%0", mRspBuf.Length());
             return kLongLinkSpeedTestResp;
         } else if (kCmdIdOutOfBand == anCmdID) {
-            uint32_t nType = ((uint32_t*)body.Ptr(16))[0];
-            uint32_t nTime = ((uint32_t*)body.Ptr(16))[1];
+            uint32_t nType = ((uint32_t *) body.Ptr(16))[0];
+            uint32_t nTime = ((uint32_t *) body.Ptr(16))[1];
             nType = ntohl(nType);
             nTime = ntohl(nTime);
             xwarn2(TSF"out of band,nType:%0, nTime:%1", nType, nTime);
 
-            resp_ab_.Reset();
+            mRspBuf.Reset();
             return kLongLinkSpeedTestOOB;
         } else if (longlink_noop_isresp(Task::kNoopTaskID, anCmdID, anSeq, body, extension)) {
             return kLongLinkSpeedTestSuc;
@@ -231,9 +231,9 @@ int LongLinkSpeedTestItem::__HandleSpeedTestResp() {
 
 ////////////////////////////////////////////////////////////////
 
-LongLinkSpeedTest::LongLinkSpeedTest(const boost::shared_ptr<NetSource>& _netsource): netsource_(_netsource)
-    , selector_(breaker_) {
-    if (!breaker_.IsCreateSuc()) {
+LongLinkSpeedTest::LongLinkSpeedTest(const boost::shared_ptr<NetSource> &netSource) : mNetSource(netSource),
+                                                                                       mSelector(mBreaker) {
+    if (!mBreaker.IsCreateSuc()) {
         xassert2(false, "pipe error");
         return;
     }
@@ -242,20 +242,21 @@ LongLinkSpeedTest::LongLinkSpeedTest(const boost::shared_ptr<NetSource>& _netsou
 LongLinkSpeedTest::~LongLinkSpeedTest() {
 }
 
-bool LongLinkSpeedTest::GetFastestSocket(int& _fdSocket, std::string& _strIp, unsigned int& _port, IPSourceType& _type, unsigned long& _connectMillSec) {
+bool LongLinkSpeedTest::GetFastestSocket(int &_fdSocket, std::string &_strIp, unsigned int &port, IPSourceType &type,
+                                         unsigned long &_connectMillSec) {
     xdebug_function();
 
     std::vector<IPPortItem> ipItemVec;
 
-    if (!netsource_->GetLongLinkSpeedTestIPs(ipItemVec)) {
+    if (!mNetSource->GetLongLinkSpeedTestIPs(ipItemVec)) {
         xerror2(TSF"ipItemVec is empty");
         return false;
     }
 
-    std::vector<LongLinkSpeedTestItem*> speedTestItemVec;
+    std::vector<LongLinkSpeedTestItem *> speedTestItemVec;
 
     for (std::vector<IPPortItem>::iterator iter = ipItemVec.begin(); iter != ipItemVec.end(); ++iter) {
-        LongLinkSpeedTestItem* item = new LongLinkSpeedTestItem((*iter).str_ip, (*iter).port);
+        LongLinkSpeedTestItem *item = new LongLinkSpeedTestItem((*iter).ip, (*iter).port);
         speedTestItemVec.push_back(item);
     }
 
@@ -263,13 +264,14 @@ bool LongLinkSpeedTest::GetFastestSocket(int& _fdSocket, std::string& _strIp, un
     bool loopShouldBeStop = false;
 
     while (!loopShouldBeStop) {
-        selector_.PreSelect();
+        mSelector.PreSelect();
 
-        for (std::vector<LongLinkSpeedTestItem*>::iterator iter = speedTestItemVec.begin(); iter != speedTestItemVec.end(); ++iter) {
-            (*iter)->HandleSetFD(selector_);
+        for (std::vector<LongLinkSpeedTestItem *>::iterator iter = speedTestItemVec.begin();
+             iter != speedTestItemVec.end(); ++iter) {
+            (*iter)->HandleSetFD(mSelector);
         }
 
-        int selectRet = selector_.Select(kTimeout);
+        int selectRet = mSelector.Select(kTimeout);
 
         if (selectRet == 0) {
             xerror2(TSF"time out");
@@ -280,27 +282,28 @@ bool LongLinkSpeedTest::GetFastestSocket(int& _fdSocket, std::string& _strIp, un
             xerror2(TSF"select errror, ret:%0, strerror(errno):%1", selectRet, strerror(errno));
 
             if (EINTR == errno && tryCount < 3) {
-                ++  tryCount;
+                ++tryCount;
                 continue;
             } else {
                 break;
             }
         }
 
-        if (selector_.IsException()) {
+        if (mSelector.IsException()) {
             xerror2(TSF"pipe exception");
             break;
         }
 
-        if (selector_.IsBreak()) {
+        if (mSelector.IsBreak()) {
             xwarn2(TSF"FD_ISSET(pipe_[0], &readfd)");
             break;
         }
 
         size_t count = 0;
 
-        for (std::vector<LongLinkSpeedTestItem*>::iterator iter = speedTestItemVec.begin(); iter != speedTestItemVec.end(); ++iter) {
-            (*iter)->HandleFDISSet(selector_);
+        for (std::vector<LongLinkSpeedTestItem *>::iterator iter = speedTestItemVec.begin();
+             iter != speedTestItemVec.end(); ++iter) {
+            (*iter)->HandleFDISSet(mSelector);
 
             if (kLongLinkSpeedTestSuc == (*iter)->GetState()) {
                 loopShouldBeStop = true;
@@ -319,19 +322,21 @@ bool LongLinkSpeedTest::GetFastestSocket(int& _fdSocket, std::string& _strIp, un
     }
 
 
-    for (std::vector<LongLinkSpeedTestItem*>::iterator iter = speedTestItemVec.begin(); iter != speedTestItemVec.end(); ++iter) {
-        for (std::vector<IPPortItem>::iterator ipItemIter = ipItemVec.begin(); ipItemIter != ipItemVec.end(); ++ipItemIter) {
+    for (std::vector<LongLinkSpeedTestItem *>::iterator iter = speedTestItemVec.begin();
+         iter != speedTestItemVec.end(); ++iter) {
+        for (std::vector<IPPortItem>::iterator ipItemIter = ipItemVec.begin();
+             ipItemIter != ipItemVec.end(); ++ipItemIter) {
             std::string ip = (*iter)->GetIP();
 
-            if (ip != (*ipItemIter).str_ip || (*iter)->GetPort() != (*ipItemIter).port) {
+            if (ip != (*ipItemIter).ip || (*iter)->GetPort() != (*ipItemIter).port) {
                 continue;
             }
 
             if (kLongLinkSpeedTestSuc == (*iter)->GetState()) {
                 // (*ipItemIter).eState = ETestOK;
-                _type = (*ipItemIter).source_type;
-                _strIp = (*ipItemIter).str_ip;
-                _port = (*iter)->GetPort();
+                type = (*ipItemIter).sourceType;
+                _strIp = (*ipItemIter).ip;
+                port = (*iter)->GetPort();
             } else if (kLongLinkSpeedTestFail == (*iter)->GetState()) {
                 // (*ipItemIter).eState = ETestFail;
             } else {
@@ -343,11 +348,12 @@ bool LongLinkSpeedTest::GetFastestSocket(int& _fdSocket, std::string& _strIp, un
     }
 
     // report the result of speed test
-    netsource_->ReportLongLinkSpeedTestResult(ipItemVec);
+    mNetSource->ReportLongLinkSpeedTestResult(ipItemVec);
 
     bool bRet = false;
 
-    for (std::vector<LongLinkSpeedTestItem*>::iterator iter = speedTestItemVec.begin(); iter != speedTestItemVec.end(); ++iter) {
+    for (std::vector<LongLinkSpeedTestItem *>::iterator iter = speedTestItemVec.begin();
+         iter != speedTestItemVec.end(); ++iter) {
         if (kLongLinkSpeedTestSuc == (*iter)->GetState() && !bRet) {
             bRet = true;
             _fdSocket = (*iter)->GetSocket();
@@ -366,5 +372,5 @@ bool LongLinkSpeedTest::GetFastestSocket(int& _fdSocket, std::string& _strIp, un
 }
 
 boost::shared_ptr<NetSource> LongLinkSpeedTest::GetNetSource() {
-    return netsource_;
+    return mNetSource;
 }

@@ -77,20 +77,20 @@ JNIEXPORT void JNICALL Java_com_tencent_mars_stn_StnLogic_reset
  */
 DEFINE_FIND_STATIC_METHOD(KJava2C_setLonglinkSvrAddr, KNetJava2C, "setLonglinkSvrAddr", "(Ljava/lang/String;[ILjava/lang/String;)V")
 JNIEXPORT void JNICALL Java_com_tencent_mars_stn_StnLogic_setLonglinkSvrAddr
-  (JNIEnv *_env, jclass, jstring _host, jintArray _ports, jstring _debug_ip) {
+  (JNIEnv *_env, jclass, jstring jhost, jintArray jports, jstring _debug_ip) {
 
-	std::string host = (NULL == _host ? "" : ScopedJstring(_env, _host).GetChar());
+	std::string host = (NULL == jhost ? "" : ScopedJstring(_env, jhost).GetChar());
 	std::string debug_ip = (NULL == _debug_ip ? "" : ScopedJstring(_env, _debug_ip).GetChar());
 	std::vector<uint16_t> ports;
 
-	if(NULL != _ports && _env->GetArrayLength(_ports) > 0)	{
-		int ports_len = _env->GetArrayLength(_ports);
-		jint* p_port = _env->GetIntArrayElements(_ports, NULL);
+	if(NULL != jports && _env->GetArrayLength(jports) > 0)	{
+		int ports_len = _env->GetArrayLength(jports);
+		jint* p_port = _env->GetIntArrayElements(jports, NULL);
 
 		for(int i=0;i<ports_len;++i){
 			ports.push_back((uint16_t)(p_port[i]));
 		}
-		_env->ReleaseIntArrayElements(_ports, p_port, 0);
+		_env->ReleaseIntArrayElements(jports, p_port, 0);
 
 	}
 
@@ -104,10 +104,10 @@ JNIEXPORT void JNICALL Java_com_tencent_mars_stn_StnLogic_setLonglinkSvrAddr
  */
 DEFINE_FIND_STATIC_METHOD(KJava2C_setShortlinkSvrAddr, KNetJava2C, "setShortlinkSvrAddr", "(ILjava/lang/String;)V")
 JNIEXPORT void JNICALL Java_com_tencent_mars_stn_StnLogic_setShortlinkSvrAddr
-  (JNIEnv *_env, jclass, jint _port, jstring _debug_ip) {
+  (JNIEnv *_env, jclass, jint port, jstring _debug_ip) {
 
 	std::string debug_ip = (NULL == _debug_ip ? "" : ScopedJstring(_env, _debug_ip).GetChar());
-	SetShortlinkSvrAddr(_port, debug_ip);
+	SetShortlinkSvrAddr(port, debug_ip);
   
 }
 
@@ -118,9 +118,9 @@ JNIEXPORT void JNICALL Java_com_tencent_mars_stn_StnLogic_setShortlinkSvrAddr
  */
 DEFINE_FIND_STATIC_METHOD(KJava2C_setDebugIP, KNetJava2C, "setDebugIP", "(Ljava/lang/String;Ljava/lang/String;)V")
 JNIEXPORT void JNICALL Java_com_tencent_mars_stn_StnLogic_setDebugIP
-  (JNIEnv *_env, jclass, jstring _host, jstring _debug_ip) {
+  (JNIEnv *_env, jclass, jstring jhost, jstring _debug_ip) {
 
-	std::string host = (NULL == _host ? "" : ScopedJstring(_env, _host).GetChar());
+	std::string host = (NULL == jhost ? "" : ScopedJstring(_env, jhost).GetChar());
 	std::string debug_ip = (NULL == _debug_ip ? "" : ScopedJstring(_env, _debug_ip).GetChar());
 	SetDebugIP(host,  debug_ip);
 }
@@ -132,8 +132,8 @@ JNIEXPORT void JNICALL Java_com_tencent_mars_stn_StnLogic_setDebugIP
  */
 DEFINE_FIND_STATIC_METHOD(KJava2C_setBackupIPs, KNetJava2C, "setBackupIPs", "(Ljava/lang/String;[Ljava/lang/String;)V")
 JNIEXPORT void JNICALL Java_com_tencent_mars_stn_StnLogic_setBackupIPs
-  (JNIEnv *_env, jclass, jstring _host, jobjectArray _objarray) {
-	std::string host = (NULL == _host ? "" : ScopedJstring(_env, _host).GetChar());
+  (JNIEnv *_env, jclass, jstring jhost, jobjectArray _objarray) {
+	std::string host = (NULL == jhost ? "" : ScopedJstring(_env, jhost).GetChar());
 	std::vector<std::string> backupip_list;
 
 	jsize size = _env->GetArrayLength(_objarray);
@@ -155,50 +155,50 @@ JNIEXPORT void JNICALL Java_com_tencent_mars_stn_StnLogic_setBackupIPs
  */
 DEFINE_FIND_STATIC_METHOD(KJava2C_startTask, KNetJava2C, "startTask", "(Lcom/tencent/mars/stn/StnLogic$Task;)V")
 JNIEXPORT void JNICALL Java_com_tencent_mars_stn_StnLogic_startTask
-  (JNIEnv *_env, jclass, jobject _task) {
+  (JNIEnv *_env, jclass, jobject jtask) {
 	xverbose_function();
 
 	//get the field value of the netcmd
-	jint taskid = JNU_GetField(_env, _task, "taskID", "I").i;
-	jint cmdid = JNU_GetField(_env, _task, "cmdID", "I").i;
-	jint channel_select = JNU_GetField(_env, _task, "channelSelect", "I").i;
-	jobject hostlist = JNU_GetField(_env, _task, "shortLinkHostList", "Ljava/util/ArrayList;").l;
-	jstring cgi = (jstring)JNU_GetField(_env, _task, "cgi", "Ljava/lang/String;").l;
+	jint taskid = JNU_GetField(_env, jtask, "taskID", "I").i;
+	jint cmdid = JNU_GetField(_env, jtask, "cmdID", "I").i;
+	jint channelSelect = JNU_GetField(_env, jtask, "channelSelect", "I").i;
+	jobject hostlist = JNU_GetField(_env, jtask, "shortLinkHostList", "Ljava/util/ArrayList;").l;
+	jstring cgi = (jstring)JNU_GetField(_env, jtask, "cgi", "Ljava/lang/String;").l;
 
-	jboolean send_only = JNU_GetField(_env, _task, "sendOnly", "Z").z;
-	jboolean need_authed = JNU_GetField(_env, _task, "needAuthed", "Z").z;
-	jboolean limit_flow = JNU_GetField(_env, _task, "limitFlow", "Z").z;
-	jboolean limit_frequency = JNU_GetField(_env, _task, "limitFrequency", "Z").z;
+	jboolean send_only = JNU_GetField(_env, jtask, "sendOnly", "Z").z;
+	jboolean need_authed = JNU_GetField(_env, jtask, "needAuthed", "Z").z;
+	jboolean limit_flow = JNU_GetField(_env, jtask, "limitFlow", "Z").z;
+	jboolean limit_frequency = JNU_GetField(_env, jtask, "limitFrequency", "Z").z;
 
-	jint channel_strategy = JNU_GetField(_env, _task, "channelStrategy", "I").i;
-	jboolean network_status_sensitive = JNU_GetField(_env, _task, "networkStatusSensitive", "Z").z;
-	jint priority = JNU_GetField(_env, _task, "priority", "I").i;
+	jint channel_strategy = JNU_GetField(_env, jtask, "channelStrategy", "I").i;
+	jboolean network_status_sensitive = JNU_GetField(_env, jtask, "networkStatusSensitive", "Z").z;
+	jint priority = JNU_GetField(_env, jtask, "priority", "I").i;
 
-	jint retrycount = JNU_GetField(_env, _task, "retryCount", "I").i;
-	jint server_process_cost = JNU_GetField(_env, _task, "serverProcessCost", "I").i;
-	jint total_timetout = JNU_GetField(_env, _task, "totalTimeout", "I").i;
-	jstring report_arg = (jstring)JNU_GetField(_env, _task, "reportArg", "Ljava/lang/String;").l;
+	jint retrycount = JNU_GetField(_env, jtask, "retryCount", "I").i;
+	jint server_process_cost = JNU_GetField(_env, jtask, "serverProcessCost", "I").i;
+	jint total_timetout = JNU_GetField(_env, jtask, "totalTimeout", "I").i;
+	jstring report_arg = (jstring)JNU_GetField(_env, jtask, "reportArg", "Ljava/lang/String;").l;
 
 	//init struct Task
 	struct Task task(taskid);
-	task.cmdid = cmdid;
-	task.channel_select = channel_select;
+	task.cmdId = cmdid;
+	task.channelSelect = channelSelect;
 
-	task.send_only = send_only;
-	task.need_authed = need_authed;
-	task.limit_flow = limit_flow;
-	task.limit_frequency = limit_frequency;
+	task.sendOnly = send_only;
+	task.needAuthed = need_authed;
+	task.limitFlow = limit_flow;
+	task.limitFrequency = limit_frequency;
 
-	task.channel_strategy = channel_strategy;
-	task.network_status_sensitive = network_status_sensitive;
+	task.channelStrategy = channel_strategy;
+	task.networkStatusSensitive = network_status_sensitive;
 	task.priority = priority;
 
-	task.retry_count = retrycount;
-	task.server_process_cost = server_process_cost;
-	task.total_timetout = total_timetout;
+	task.retryCount = retrycount;
+	task.serverProcessCost = server_process_cost;
+	task.totalTimetout = total_timetout;
 
 	if (NULL != report_arg) {
-		task.report_arg = ScopedJstring(_env, report_arg).GetChar();
+		task.reportArg = ScopedJstring(_env, report_arg).GetChar();
 	}
 
 	if (NULL != hostlist) {
@@ -210,7 +210,7 @@ JNIEXPORT void JNICALL Java_com_tencent_mars_stn_StnLogic_startTask
 		for(int i = 0; i < len; i++){
 			jstring host = (jstring)_env->CallObjectMethod(hostlist, arraylist_get, i);
 			if (NULL != host) {
-				task.shortlink_host_list.push_back(ScopedJstring(_env, host).GetChar());
+				task.shortLinkHostList.push_back(ScopedJstring(_env, host).GetChar());
 				_env->DeleteLocalRef(host);
 			}
 		}
@@ -222,10 +222,10 @@ JNIEXPORT void JNICALL Java_com_tencent_mars_stn_StnLogic_startTask
 		_env->DeleteLocalRef(cgi);
 	}
 
-	jobject _user_context = JNU_GetField(_env, _task, "userContext", "Ljava/lang/Object;").l;
-	if (NULL != _user_context) {
-		task.user_context = _env->NewGlobalRef(_user_context);
-		_env->DeleteLocalRef(_user_context);
+	jobject userContext = JNU_GetField(_env, jtask, "userContext", "Ljava/lang/Object;").l;
+	if (NULL != userContext) {
+		task.userContext = _env->NewGlobalRef(userContext);
+		_env->DeleteLocalRef(userContext);
 	}
 
 	StartTask(task);
@@ -238,18 +238,18 @@ JNIEXPORT void JNICALL Java_com_tencent_mars_stn_StnLogic_startTask
  */
 DEFINE_FIND_STATIC_METHOD(KJava2C_stopTask, KNetJava2C, "stopTask", "(I)V")
 JNIEXPORT void JNICALL Java_com_tencent_mars_stn_StnLogic_stopTask
-  (JNIEnv *_env, jclass, jint _taskid) {
+  (JNIEnv *_env, jclass, jint taskId) {
 	xverbose_function();
 
-	StopTask(_taskid);
+	StopTask(taskId);
 }
 
 DEFINE_FIND_STATIC_METHOD(KJava2C_hasTask, KNetJava2C, "hasTask", "(I)Z")
 JNIEXPORT jboolean JNICALL Java_com_tencent_mars_stn_StnLogic_hasTask
-  (JNIEnv *_env, jclass, jint _taskid) {
+  (JNIEnv *_env, jclass, jint taskId) {
 	xverbose_function();
 
-	return HasTask(_taskid);
+	return HasTask(taskId);
 }
 
 /*
@@ -296,10 +296,10 @@ JNIEXPORT void JNICALL Java_com_tencent_mars_stn_StnLogic_makesureLongLinkConnec
  * Signature: (JJ)V
  */
 JNIEXPORT void JNICALL Java_com_tencent_mars_stn_StnLogic_setSignallingStrategy
-  (JNIEnv *_env, jclass, jlong _period, jlong _keep_time) {
+  (JNIEnv *_env, jclass, jlong period, jlong keepTime) {
 	xverbose_function();
 
-	SetSignallingStrategy((long)_period, (long)_keep_time);
+	SetSignallingStrategy((long)period, (long)keepTime);
 }
 
 /*

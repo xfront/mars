@@ -34,81 +34,107 @@
 #include "longlink_connect_monitor.h"
 
 class AutoBuffer;
+
 class ActiveLogic;
 
 struct STChannelResp;
 
 #ifdef ANDROID
+
 class WakeUpLock;
+
 #endif
 
 namespace mars {
-    namespace stn {
+namespace stn {
 
 struct TaskProfile;
+
 class DynamicTimeout;
+
 class LongLinkConnectMonitor;
 
 class LongLinkTaskManager {
-  public:
-    boost::function<int (ErrCmdType _err_type, int _err_code, int _fail_handle, const Task& _task, unsigned int _taskcosttime)> fun_callback_;
+public:
+    boost::function<int(ErrCmdType errType, int errCode, int failHandle, const Task &task,
+                        unsigned int taskCostTime)> CallResultHook;
 
-    boost::function<void (ErrCmdType _err_type, int _err_code, int _fail_handle, uint32_t _src_taskid)> fun_notify_retry_all_tasks;
-    boost::function<void (int _line, ErrCmdType _err_type, int _err_code, const std::string& _ip, uint16_t _port)> fun_notify_network_err_;
-    boost::function<bool (const Task& _task, const void* _buffer, int _len)> fun_anti_avalanche_check_;
-    
-    boost::function<void (uint64_t _channel_id, uint32_t _cmdid, uint32_t _taskid, const AutoBuffer& _body, const AutoBuffer& _extend)> fun_on_push_;
-    
+    boost::function<void(ErrCmdType errType, int errCode, int failHandle,
+                         uint32_t srcTaskId)> NotifyRetryAllTasksHook;
+    boost::function<void(int _line, ErrCmdType errType, int errCode, const std::string &ip,
+                         uint16_t port)> NotifyNetworkErrorHook;
+    boost::function<bool(const Task &task, const void *buffer, int len)> AntiAvalancheCheckHook;
 
-  public:
-    LongLinkTaskManager(mars::stn::NetSource& _netsource, ActiveLogic& _activelogic, DynamicTimeout& _dynamictimeout, MessageQueue::MessageQueue_t  _messagequeueid);
+    boost::function<void(uint64_t channelId, uint32_t cmdId, uint32_t taskId, const AutoBuffer &body,
+                         const AutoBuffer &bufExt)> OnPushHook;
+
+public:
+    LongLinkTaskManager(mars::stn::NetSource &netSource, ActiveLogic &activeLogic, DynamicTimeout &_dynamictimeout,
+                        MessageQueue::MessageQueue_t msgQueueId);
+
     virtual ~LongLinkTaskManager();
 
-    bool StartTask(const Task& _task);
-    bool StopTask(uint32_t _taskid);
-    bool HasTask(uint32_t _taskid) const;
-    void ClearTasks();
-    void RedoTasks();
-    void RetryTasks(ErrCmdType _err_type, int _err_code, int _fail_handle, uint32_t _src_taskid);
+    bool StartTask(const Task &task);
 
-    LongLink& LongLinkChannel() { return *longlink_; }
-    LongLinkConnectMonitor& getLongLinkConnectMonitor() { return *longlinkconnectmon_; }
+    bool StopTask(uint32_t taskId);
+
+    bool HasTask(uint32_t taskId) const;
+
+    void ClearTasks();
+
+    void RedoTasks();
+
+    void RetryTasks(ErrCmdType errType, int errCode, int failHandle, uint32_t srcTaskId);
+
+    LongLink &LongLinkChannel() { return *mLongLink; }
+
+    LongLinkConnectMonitor &getLongLinkConnectMonitor() { return *mLongLinkConnectMon; }
 
     unsigned int GetTaskCount();
+
     unsigned int GetTasksContinuousFailCount();
 
-  private:
+private:
     // from ILongLinkObserver
-    void __OnResponse(ErrCmdType _error_type, int _error_code, uint32_t _cmdid, uint32_t _taskid, AutoBuffer& _body, AutoBuffer& _extension, const ConnectProfile& _connect_profile);
-    void __OnSend(uint32_t _taskid);
-    void __OnRecv(uint32_t _taskid, size_t _cachedsize, size_t _totalsize);
+    void __OnResponse(ErrCmdType errorType, int errorCode, uint32_t cmdId, uint32_t taskId, AutoBuffer &body,
+                      AutoBuffer &extension, const ConnectProfile &connectProfile);
+
+    void __OnSend(uint32_t taskId);
+
+    void __OnRecv(uint32_t taskId, size_t _cachedsize, size_t _totalsize);
+
     void __SignalConnection(LongLink::TLongLinkStatus _connect_status);
 
     void __RunLoop();
+
     void __RunOnTimeout();
+
     void __RunOnStartTask();
 
-    void __BatchErrorRespHandle(ErrCmdType _err_type, int _err_code, int _fail_handle, uint32_t _src_taskid, const ConnectProfile& _connect_profile, bool _callback_runing_task_only = true);
-    bool __SingleRespHandle(std::list<TaskProfile>::iterator _it, ErrCmdType _err_type, int _err_code, int _fail_handle, const ConnectProfile& _connect_profile);
+    void __BatchErrorRespHandle(ErrCmdType errType, int errCode, int failHandle, uint32_t srcTaskId,
+                                const ConnectProfile &connectProfile, bool callbackRunningTaskOnly = true);
 
-    std::list<TaskProfile>::iterator __Locate(uint32_t  _taskid);
+    bool __SingleRespHandle(std::list<TaskProfile>::iterator it, ErrCmdType errType, int errCode, int failHandle,
+                            const ConnectProfile &connectProfile);
 
-  private:
-    MessageQueue::ScopeRegister     asyncreg_;
-    std::list<TaskProfile>          lst_cmd_;
-    uint64_t                        lastbatcherrortime_;   // ms
-    unsigned long                   retry_interval_;	//ms
-    unsigned int                    tasks_continuous_fail_count_;
+    std::list<TaskProfile>::iterator __Locate(uint32_t taskId);
 
-    LongLink*                       longlink_;
-    LongLinkConnectMonitor*         longlinkconnectmon_;
-    DynamicTimeout&                 dynamic_timeout_;
+private:
+    MessageQueue::ScopeRegister mAsyncReg;
+    std::list<TaskProfile> mTaskList;
+    uint64_t mLastBatchErrorTime;   // ms
+    unsigned long mRetryInterval;    //ms
+    unsigned int mTasksContinuousFailCount;
+
+    LongLink *mLongLink;
+    LongLinkConnectMonitor *mLongLinkConnectMon;
+    DynamicTimeout &mDynamicTimeout;
 
 #ifdef ANDROID
-    WakeUpLock*                     wakeup_lock_;
+    WakeUpLock *mWakeupLock;
 #endif
 };
-    }
+}
 }
 
 #endif // STN_SRC_LONGLINK_TASK_MANAGER_H_

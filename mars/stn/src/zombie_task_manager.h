@@ -33,39 +33,48 @@
 struct ZombieTask;
 
 namespace mars {
-    namespace stn {
+namespace stn {
 
 class ZombieTaskManager {
-  public:
-    boost::function<void (const Task& _task)> fun_start_task_;
-    boost::function<int (ErrCmdType _errtype, int _errcode, int _fail_handle, const Task& _task, unsigned int _taskcosttime)> fun_callback_;
+public:
+    boost::function<void(const Task &task)> StartTaskHook;
+    boost::function<int(ErrCmdType errType, int errCode, int failHandle, const Task &task,
+                        unsigned int taskCostTime)> CallResultHook;
 
-  public:
-    ZombieTaskManager(MessageQueue::MessageQueue_t _messagequeueid);
+public:
+    ZombieTaskManager(MessageQueue::MessageQueue_t msgQueueId);
+
     ~ZombieTaskManager();
 
-    bool SaveTask(const Task& _task, unsigned int _taskcosttime /*ms*/);
-    bool StopTask(uint32_t _taskid);
-    bool HasTask(uint32_t _taskid) const;
+    bool SaveTask(const Task &task, unsigned int taskCostTime /*ms*/);
+
+    bool StopTask(uint32_t taskId);
+
+    bool HasTask(uint32_t taskId) const;
+
     void ClearTasks();
+
     void RedoTasks();
+
     void OnNetCoreStartTask();
 
-  private:
-    ZombieTaskManager(const ZombieTaskManager&);
-    ZombieTaskManager& operator=(const ZombieTaskManager&);
+private:
+    ZombieTaskManager(const ZombieTaskManager &);
 
-  private:
+    ZombieTaskManager &operator=(const ZombieTaskManager &);
+
+private:
     void __StartTask();
+
     void __TimerChecker();
 
-  private:
-    MessageQueue::ScopeRegister asyncreg_;
-    std::list<ZombieTask> lsttask_;
-    uint64_t net_core_last_start_task_time_;
+private:
+    MessageQueue::ScopeRegister mAsyncReg;
+    std::list<ZombieTask> mTaskList;
+    uint64_t mLastTaskTime;
 };
-        
-    }
+
+}
 }
 
 #endif // STN_SRC_ZOMBIE_TASK_MANAGER_H_

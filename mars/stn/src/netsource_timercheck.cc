@@ -36,56 +36,59 @@ using namespace mars::stn;
 
 static const unsigned int kTimeCheckPeriod = 2.5 * 60 * 1000;     // 2.5min
 // const static unsigned int TIME_CHECK_PERIOD = 30 * 1000;     //30min
-static const int kTimeout = 10*1000;     // s
+static const int kTimeout = 10 * 1000;     // s
 static const int kMaxSpeedTestCount = 30;
 static const unsigned long kIntervalTime = 1 * 60 * 60 * 1000;    // ms
 
-#define AYNC_HANDLER asyncreg_.Get()
+#define AYNC_HANDLER mAsyncReg.Get()
 #define RETURN_NETCORE_SYNC2ASYNC_FUNC(func) RETURN_SYNC2ASYNC_FUNC(func, )
 
-NetSourceTimerCheck::NetSourceTimerCheck(NetSource* _net_source, ActiveLogic& _active_logic, LongLink& _longlink, MessageQueue::MessageQueue_t  _messagequeue_id)
-    : net_source_(_net_source)
-    , seletor_(breaker_)
-    , longlink_(_longlink)
-	, asyncreg_(MessageQueue::InstallAsyncHandler(_messagequeue_id)){
-    xassert2(breaker_.IsCreateSuc(), "create breaker fail");
-        xinfo2(TSF"handler:(%_,%_)", asyncreg_.Get().queue, asyncreg_.Get().seq);
-    frequency_limit_ = new CommFrequencyLimit(kMaxSpeedTestCount, kIntervalTime);
+NetSourceTimerCheck::NetSourceTimerCheck(NetSource *netSource, ActiveLogic &activeLogic, LongLink &longLink,
+                                         MessageQueue::MessageQueue_t msgQueueId)
+        : mNetSource(netSource)
+        , mSelector(mBreaker)
+        , mLongLink(longLink)
+        ,mAsyncReg(MessageQueue::InstallAsyncHandler(msgQueueId))
+{
+    xassert2(mBreaker.IsCreateSuc(), "create breaker fail");
+    xinfo2(TSF"handler:(%_,%_)", mAsyncReg.Get().queue, mAsyncReg.Get().seq);
+    mFrequencyLimit = new CommFrequencyLimit(kMaxSpeedTestCount, kIntervalTime);
 
-    active_connection_ = _active_logic.SignalActive.connect(boost::bind(&NetSourceTimerCheck::__OnActiveChanged, this, _1));
+    ActiveConn = activeLogic.SignalActive.connect(
+            boost::bind(&NetSourceTimerCheck::__OnActiveChanged, this, _1));
 
-    if (_active_logic.IsActive()) {
-    	__StartCheck();
+    if (activeLogic.IsActive()) {
+        __StartCheck();
     }
 }
 
 NetSourceTimerCheck::~NetSourceTimerCheck() {
-    
+
     do {
-        if (!thread_.isruning()) {
+        if (!mThread.isRunning()) {
             break;
         }
-        
-        if (!breaker_.Break()) {
+
+        if (!mBreaker.Break()) {
             xerror2(TSF"write into pipe error");
             break;
         }
-    
-        thread_.join();
+
+        mThread.join();
     } while (false);
-    
-    delete frequency_limit_;
+
+    delete mFrequencyLimit;
 }
 
 void NetSourceTimerCheck::CancelConnect() {
-	RETURN_NETCORE_SYNC2ASYNC_FUNC(boost::bind(&NetSourceTimerCheck::CancelConnect, this));
+    RETURN_NETCORE_SYNC2ASYNC_FUNC(boost::bind(&NetSourceTimerCheck::CancelConnect, this));
     xinfo_function();
 
-    if (!thread_.isruning()) {
+    if (!mThread.isRunning()) {
         return;
     }
 
-    if (!breaker_.Break()) {
+    if (!mBreaker.Break()) {
         xerror2(TSF"write into pipe error");
     }
 
@@ -93,98 +96,100 @@ void NetSourceTimerCheck::CancelConnect() {
 
 void NetSourceTimerCheck::__StartCheck() {
 
-	RETURN_NETCORE_SYNC2ASYNC_FUNC(boost::bind(&NetSourceTimerCheck::__StartCheck, this));
+    RETURN_NETCORE_SYNC2ASYNC_FUNC(boost::bind(&NetSourceTimerCheck::__StartCheck, this));
     xdebug_function();
 
-    if (asyncpost_ != MessageQueue::KNullPost) return;
+    if (mAsyncPost != MessageQueue::KNullPost) return;
 
-    asyncpost_ = MessageQueue::AsyncInvokePeriod(kTimeCheckPeriod, kTimeCheckPeriod, boost::bind(&NetSourceTimerCheck::__Check, this), asyncreg_.Get(), "NetSourceTimerCheck::__Check()");
+    mAsyncPost = MessageQueue::AsyncInvokePeriod(kTimeCheckPeriod, kTimeCheckPeriod,
+                                                 boost::bind(&NetSourceTimerCheck::__Check, this), mAsyncReg.Get(),
+                                                 "NetSourceTimerCheck::__Check()");
 
 }
 
 void NetSourceTimerCheck::__Check() {
 
-    IPSourceType pre_iptype = longlink_.Profile().ip_type;
+    IPSourceType pre_iptype = mLongLink.Profile().ipType;
     if (kIPSourceDebug == pre_iptype || kIPSourceNULL == pre_iptype
-    		|| kIPSourceNewDns == pre_iptype || kIPSourceDNS == pre_iptype) {
-    	return;
+        || kIPSourceNewDns == pre_iptype || kIPSourceDNS == pre_iptype) {
+        return;
     }
 
-    if (thread_.isruning()) {
+    if (mThread.isRunning()) {
         return;
     }
 
     // limit the frequency of speed test
-    if (!frequency_limit_->Check()) {
+    if (!mFrequencyLimit->Check()) {
         xwarn2(TSF"frequency limit");
         return;
     }
 
-    if (!breaker_.IsCreateSuc() && !breaker_.ReCreate()) {
+    if (!mBreaker.IsCreateSuc() && !mBreaker.ReCreate()) {
         xassert2(false, "break error!");
         return;
     }
 
-    std::string linkedhost = longlink_.Profile().host;
+    std::string linkedhost = mLongLink.Profile().host;
     xdebug2(TSF"current host:%0", linkedhost);
 
-    thread_.start(boost::bind(&NetSourceTimerCheck::__Run, this, linkedhost));
+    mThread.start(boost::bind(&NetSourceTimerCheck::__Run, this, linkedhost));
 
 }
 
 void NetSourceTimerCheck::__StopCheck() {
 
-	RETURN_NETCORE_SYNC2ASYNC_FUNC(boost::bind(&NetSourceTimerCheck::__StopCheck, this));
+    RETURN_NETCORE_SYNC2ASYNC_FUNC(boost::bind(&NetSourceTimerCheck::__StopCheck, this));
 
     xdebug_function();
 
-    if (asyncpost_ == MessageQueue::KNullPost) return;
+    if (mAsyncPost == MessageQueue::KNullPost) return;
 
-    if (!thread_.isruning()) {
+    if (!mThread.isRunning()) {
         return;
     }
 
-    if (!breaker_.Break()) {
+    if (!mBreaker.Break()) {
         xerror2(TSF"write into pipe error");
         return;
     }
 
-    thread_.join();
+    mThread.join();
 
-    asyncreg_.Cancel();
-    asyncpost_ = MessageQueue::KNullPost;
+    mAsyncReg.Cancel();
+    mAsyncPost = MessageQueue::KNullPost;
 }
 
-void NetSourceTimerCheck::__Run(const std::string& _host) {
+void NetSourceTimerCheck::__Run(const std::string &host) {
     //clear the pipe
-    breaker_.Clear();
+    mBreaker.Clear();
 
-	if (__TryConnnect(_host)) {
+    if (__TryConnnect(host)) {
 
-		xassert2(fun_time_check_suc_);
+        xassert2(TimeCheckSuccHook);
 
-		if (fun_time_check_suc_) {
-			// reset the long link
-			fun_time_check_suc_();
-		}
+        if (TimeCheckSuccHook) {
+            // reset the long link
+            TimeCheckSuccHook();
+        }
 
-	}
+    }
 
 }
 
 
-bool NetSourceTimerCheck::__TryConnnect(const std::string& _host) {
+bool NetSourceTimerCheck::__TryConnnect(const std::string &host) {
     std::vector<std::string> ip_vec;
 
-    dns_util_.GetNewDNS().GetHostByName(_host, ip_vec);
+    mDnsUtil.GetNewDNS().GetHostByName(host, ip_vec);
 
-    if (ip_vec.empty()) dns_util_.GetDNS().GetHostByName(_host, ip_vec);
+    if (ip_vec.empty()) mDnsUtil.GetDNS().GetHostByName(host, ip_vec);
     if (ip_vec.empty()) return false;
 
     for (std::vector<std::string>::iterator iter = ip_vec.begin(); iter != ip_vec.end(); ++iter) {
-    	if (*iter == longlink_.Profile().ip) {
-    		return false;
-    	}
+        if (*iter == mLongLink.Profile().ip) {
+            return false;
+        }
     }
 
     std::vector<uint16_t> port_vec;
@@ -196,17 +201,17 @@ bool NetSourceTimerCheck::__TryConnnect(const std::string& _host) {
     }
 
     // random get speed test ip and port
-    srand((unsigned)gettickcount());
+    srand((unsigned) gettickcount());
     size_t ip_index = rand() % ip_vec.size();
     size_t port_index = rand() % port_vec.size();
 
     LongLinkSpeedTestItem speed_item(ip_vec[ip_index], port_vec[port_index]);
 
     while (true) {
-        seletor_.PreSelect();
-        speed_item.HandleSetFD(seletor_);
+        mSelector.PreSelect();
+        speed_item.HandleSetFD(mSelector);
 
-        int select_ret = seletor_.Select(kTimeout);
+        int select_ret = mSelector.Select(kTimeout);
 
         if (select_ret == 0) {
             xerror2(TSF"time out");
@@ -217,17 +222,17 @@ bool NetSourceTimerCheck::__TryConnnect(const std::string& _host) {
             xerror2(TSF"select errror, ret:%0, strerror(errno):%1", select_ret, strerror(errno));
         }
 
-        if (seletor_.IsException()) {
+        if (mSelector.IsException()) {
             xerror2(TSF"pipe exception");
             break;
         }
 
-        if (seletor_.IsBreak()) {
+        if (mSelector.IsBreak()) {
             xwarn2(TSF"FD_ISSET(pipe_[0], &readfd)");
             break;
         }
 
-        speed_item.HandleFDISSet(seletor_);
+        speed_item.HandleFDISSet(mSelector);
 
         if (kLongLinkSpeedTestSuc == speed_item.GetState() || kLongLinkSpeedTestFail == speed_item.GetState()) {
             break;
@@ -237,25 +242,24 @@ bool NetSourceTimerCheck::__TryConnnect(const std::string& _host) {
     speed_item.CloseSocket();
 
 
-
     if (kLongLinkSpeedTestSuc == speed_item.GetState()) {
-        net_source_->RemoveLongBanIP(speed_item.GetIP());
+        mNetSource->RemoveLongBanIP(speed_item.GetIP());
         return true;
     }
 
     return false;
 }
 
-void NetSourceTimerCheck::__OnActiveChanged(bool _is_active) {
+void NetSourceTimerCheck::__OnActiveChanged(bool isActive) {
     ASYNC_BLOCK_START
-    
-    xdebug2(TSF"_is_active:%0", _is_active);
 
-    if (_is_active) {
-        __StartCheck();
-    } else {
-    	__StopCheck();
-    }
-    
+                xdebug2(TSF"isActive:%0", isActive);
+
+                if (isActive) {
+                    __StartCheck();
+                } else {
+                    __StopCheck();
+                }
+
     ASYNC_BLOCK_END
 }

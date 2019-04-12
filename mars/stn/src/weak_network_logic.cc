@@ -31,200 +31,207 @@
 namespace mars {
 namespace stn {
 
-    //do not delete or insert
-    enum TKey {
-        kEnterWeak = 0,
-        kExitWeak,
-        kWeakTime,
-        kCGICount,
-        kCGICost,
-        kCGISucc,
-        kSceneRtt,
-        kSceneIndex,
-        kSceneFirstPkg,
-        kScenePkgPkg,
-        kSceneTask,
-        kExitSceneTask,
-        kExitSceneTimeout,
-        kExitSceneConnect,
-        kExitSceneBackground,
-        kExitQuickConnectNoNet,
-        kSceneTaskBad,
-        kFailStepDns = 31,
-        kFailStepConnect,
-        kFailStepFirstPkg,
-        kFailStepPkgPkg,
-        kFailStepDecode,
-        kFailStepOther,
-        kFailStepTimeout,
-    };
-    
-    WeakNetworkLogic::WeakNetworkLogic():is_curr_weak_(false), connect_after_weak_(0), last_connect_fail_tick_(false), last_connect_suc_tick_(false) {
-        ActiveLogic::Singleton::Instance()->SignalForeground.connect(boost::bind(&WeakNetworkLogic::__SignalForeground, this, _1));
+//do not delete or insert
+enum TKey {
+    kEnterWeak = 0,
+    kExitWeak,
+    kWeakTime,
+    kCGICount,
+    kCGICost,
+    kCGISucc,
+    kSceneRtt,
+    kSceneIndex,
+    kSceneFirstPkg,
+    kScenePkgPkg,
+    kSceneTask,
+    kExitSceneTask,
+    kExitSceneTimeout,
+    kExitSceneConnect,
+    kExitSceneBackground,
+    kExitQuickConnectNoNet,
+    kSceneTaskBad,
+    kFailStepDns = 31,
+    kFailStepConnect,
+    kFailStepFirstPkg,
+    kFailStepPkgPkg,
+    kFailStepDecode,
+    kFailStepOther,
+    kFailStepTimeout,
+};
+
+WeakNetworkLogic::WeakNetworkLogic()
+    : mIsCurrWeak(false)
+    , mConnAfterWeak(0)
+    , mLastConnFailTick(false)
+    , mLastConnSuccTick(false) {
+    ActiveLogic::Singleton::Instance()->SignalForeground.connect(
+            boost::bind(&WeakNetworkLogic::__SignalForeground, this, _1));
+}
+
+WeakNetworkLogic::~WeakNetworkLogic() {
+    ActiveLogic::Singleton::Instance()->SignalForeground.disconnect(
+            boost::bind(&WeakNetworkLogic::__SignalForeground, this, _1));
+}
+
+void WeakNetworkLogic::__SignalForeground(bool isForeground) {
+    if (!isForeground && mIsCurrWeak) {
+        mIsCurrWeak = false;
+        __ReportWeakLogic(kExitWeak, 1, false);
+        __ReportWeakLogic(kExitSceneBackground, 1, false);
+        __ReportWeakLogic(kWeakTime, (int) mFirstMarkTick.gettickspan(), false);
+        xinfo2(TSF"weak network end");
     }
-    
-    WeakNetworkLogic::~WeakNetworkLogic() {
-        ActiveLogic::Singleton::Instance()->SignalForeground.disconnect(boost::bind(&WeakNetworkLogic::__SignalForeground, this, _1));
+}
+
+void WeakNetworkLogic::__ReportWeakLogic(int key, int value, bool isImportant) {
+    if (reportWeakHook) {
+        reportWeakHook(key, value, isImportant);
     }
-    
-    void WeakNetworkLogic::__SignalForeground(bool _is_foreground) {
-        if(!_is_foreground && is_curr_weak_) {
-            is_curr_weak_ = false;
+}
+
+bool WeakNetworkLogic::IsCurrentNetworkWeak() {
+    if (mIsCurrWeak) {
+        if (mLastMarkTick.gettickspan() < MARK_TIMEOUT) return true;
+        else {
+            mIsCurrWeak = false;
             __ReportWeakLogic(kExitWeak, 1, false);
-            __ReportWeakLogic(kExitSceneBackground, 1, false);
-            __ReportWeakLogic(kWeakTime, (int)first_mark_tick_.gettickspan(), false);
+            __ReportWeakLogic(kExitSceneTimeout, 1, false);
+            __ReportWeakLogic(kWeakTime, (int) mFirstMarkTick.gettickspan(), false);
             xinfo2(TSF"weak network end");
-        }
-    }
-    
-    void WeakNetworkLogic::__ReportWeakLogic(int _key, int _value, bool _is_important) {
-        if (report_weak_logic_) {
-            report_weak_logic_(_key, _value, _is_important);
-        }
-    }
-    
-    bool WeakNetworkLogic::IsCurrentNetworkWeak() {
-        if(is_curr_weak_) {
-            if(last_mark_tick_.gettickspan() < MARK_TIMEOUT)    return true;
-            else {
-                is_curr_weak_ = false;
-                __ReportWeakLogic(kExitWeak, 1, false);
-                __ReportWeakLogic(kExitSceneTimeout, 1, false);
-                __ReportWeakLogic(kWeakTime, (int)first_mark_tick_.gettickspan(), false);
-                xinfo2(TSF"weak network end");
-                return false;
-            }
-        }
-        return false;
-    }
-    
-    bool WeakNetworkLogic::IsLastValidConnectFail(int64_t &_span) {
-        if(last_connect_fail_tick_.isValid()) {
-            _span = last_connect_fail_tick_.gettickspan();
-            return true;
-        } else if(last_connect_suc_tick_.isValid()) {
-            _span = last_connect_suc_tick_.gettickspan();
             return false;
         }
+    }
+    return false;
+}
+
+bool WeakNetworkLogic::IsLastValidConnectFail(int64_t &span) {
+    if (mLastConnFailTick.isValid()) {
+        span = mLastConnFailTick.gettickspan();
+        return true;
+    } else if (mLastConnSuccTick.isValid()) {
+        span = mLastConnSuccTick.gettickspan();
         return false;
     }
-    
-    void WeakNetworkLogic::OnConnectEvent(bool _is_suc, int _rtt, int _index) {
-        if(_is_suc) {
-            last_connect_fail_tick_.setInvalid();
-            last_connect_suc_tick_.gettickcount();
+    return false;
+}
+
+void WeakNetworkLogic::OnConnectEvent(bool isSucc, int rtt, int index) {
+    if (isSucc) {
+        mLastConnFailTick.setInvalid();
+        mLastConnSuccTick.gettickcount();
+    } else {
+        mLastConnFailTick.gettickcount();
+        mLastConnSuccTick.setInvalid();
+    }
+
+    if (!ActiveLogic::Singleton::Instance()->IsForeground())
+        return;
+
+    if (mIsCurrWeak) ++mConnAfterWeak;
+    if (!isSucc) {
+        if (mIsCurrWeak) {
+            mIsCurrWeak = false;
+            __ReportWeakLogic(kExitWeak, 1, false);
+            __ReportWeakLogic(kExitSceneConnect, 1, false);
+            __ReportWeakLogic(kWeakTime, (int) mFirstMarkTick.gettickspan(), false);
+            if (mConnAfterWeak <= 1 && mFirstMarkTick.gettickspan() < SURE_WEAK_SPAN)
+                __ReportWeakLogic(kExitQuickConnectNoNet, 1, false);
+            xinfo2(TSF"weak network end");
         }
-        else {
-            last_connect_fail_tick_.gettickcount();
-            last_connect_suc_tick_.setInvalid();
+
+        return;
+    }
+
+    bool is_weak = false;
+    if (index > 0) {
+        is_weak = true;
+        if (!mIsCurrWeak) __ReportWeakLogic(kSceneIndex, 1, false);
+    } else if (rtt > WEAK_CONNECT_RTT) {
+        is_weak = true;
+        if (!mIsCurrWeak) __ReportWeakLogic(kSceneRtt, 1, false);
+    }
+
+    if (is_weak) {
+        if (!mIsCurrWeak) {
+            mIsCurrWeak = true;
+            mConnAfterWeak = 0;
+            mFirstMarkTick.gettickcount();
+            mLastMarkTick.gettickcount();
+            __ReportWeakLogic(kEnterWeak, 1, false);
+            xinfo2(TSF"weak network rtt:%_, index:%_", rtt, index);
         }
-        
-        if(!ActiveLogic::Singleton::Instance()->IsForeground())
-            return;
-        
-        if(is_curr_weak_)   ++connect_after_weak_;
-        if(!_is_suc) {
-            if(is_curr_weak_) {
-                is_curr_weak_ = false;
+
+        mLastMarkTick.gettickcount();
+    }
+}
+
+void WeakNetworkLogic::OnPkgEvent(bool isFirstPkg, int span) {
+    if (!ActiveLogic::Singleton::Instance()->IsForeground())
+        return;
+
+    bool is_weak = (span > WEAK_PKG_SPAN);
+    if (is_weak) {
+        if (!mIsCurrWeak) {
+            mFirstMarkTick.gettickcount();
+            __ReportWeakLogic(kEnterWeak, 1, false);
+            __ReportWeakLogic(isFirstPkg ? kSceneFirstPkg : kScenePkgPkg, 1, false);
+            mIsCurrWeak = true;
+            mConnAfterWeak = 0;
+            mLastMarkTick.gettickcount();
+            xinfo2(TSF"weak network span:%_", span);
+        }
+        mLastMarkTick.gettickcount();
+    }
+}
+
+void WeakNetworkLogic::OnTaskEvent(const TaskProfile &taskProfile) {
+    if (!ActiveLogic::Singleton::Instance()->IsForeground())
+        return;
+
+    bool old_weak = mIsCurrWeak;
+    bool is_weak = false;
+    if (taskProfile.transferProfile.connectProfile.ipIndex > 0 && taskProfile.errType != kEctOK &&
+        taskProfile.errType != kEctEnDecode) {
+        is_weak = true;
+        if (!mIsCurrWeak) __ReportWeakLogic(kSceneTask, 1, false);
+    } else if (taskProfile.errType == kEctOK &&
+               (taskProfile.endTaskTime - taskProfile.startTaskTime) >= WEAK_TASK_SPAN) {
+        is_weak = true;
+        if (!mIsCurrWeak) __ReportWeakLogic(kSceneTaskBad, 1, false);
+    }
+    if (is_weak) {
+        if (!mIsCurrWeak) {
+            mFirstMarkTick.gettickcount();
+            __ReportWeakLogic(kEnterWeak, 1, false);
+            mIsCurrWeak = true;
+            mConnAfterWeak = 0;
+            mLastMarkTick.gettickcount();
+            xinfo2(TSF"weak network errtype:%_", taskProfile.errType);
+        }
+        mLastMarkTick.gettickcount();
+    } else {
+        if (taskProfile.errType == kEctOK &&
+            (taskProfile.endTaskTime - taskProfile.startTaskTime) < GOOD_TASK_SPAN) {
+            if (mIsCurrWeak) {
+                mIsCurrWeak = false;
                 __ReportWeakLogic(kExitWeak, 1, false);
-                __ReportWeakLogic(kExitSceneConnect, 1, false);
-                __ReportWeakLogic(kWeakTime, (int)first_mark_tick_.gettickspan(), false);
-                if(connect_after_weak_ <= 1 && first_mark_tick_.gettickspan() < SURE_WEAK_SPAN) __ReportWeakLogic(kExitQuickConnectNoNet, 1, false);
+                __ReportWeakLogic(kExitSceneTask, 1, false);
+                __ReportWeakLogic(kWeakTime, (int) mFirstMarkTick.gettickspan(), false);
                 xinfo2(TSF"weak network end");
             }
-            
-            return;
-        }
-        
-        bool is_weak = false;
-        if(_index > 0)  {
-            is_weak = true;
-            if(!is_curr_weak_)  __ReportWeakLogic(kSceneIndex, 1, false);
-        }
-        else if(_rtt > WEAK_CONNECT_RTT) {
-            is_weak = true;
-            if(!is_curr_weak_)  __ReportWeakLogic(kSceneRtt, 1, false);
-        }
-        
-        if(is_weak) {
-            if(!is_curr_weak_) {
-                is_curr_weak_ = true;
-                connect_after_weak_ = 0;
-                first_mark_tick_.gettickcount();
-                last_mark_tick_.gettickcount();
-                __ReportWeakLogic(kEnterWeak, 1, false);
-                xinfo2(TSF"weak network rtt:%_, index:%_", _rtt, _index);
-            }
-            
-            last_mark_tick_.gettickcount();
         }
     }
-    
-    void WeakNetworkLogic::OnPkgEvent(bool _is_firstpkg, int _span) {
-        if(!ActiveLogic::Singleton::Instance()->IsForeground())
-            return;
-        
-        bool is_weak = (_span > WEAK_PKG_SPAN);
-        if(is_weak) {
-            if(!is_curr_weak_) {
-                first_mark_tick_.gettickcount();
-                __ReportWeakLogic(kEnterWeak, 1, false);
-                __ReportWeakLogic(_is_firstpkg ? kSceneFirstPkg : kScenePkgPkg, 1, false);
-                is_curr_weak_ = true;
-                connect_after_weak_ = 0;
-                last_mark_tick_.gettickcount();
-                xinfo2(TSF"weak network span:%_", _span);
-            }
-            last_mark_tick_.gettickcount();
-        }
-    }
-    
-    void WeakNetworkLogic::OnTaskEvent(const TaskProfile& _task_profile) {
-        if(!ActiveLogic::Singleton::Instance()->IsForeground())
-            return;
-        
-        bool old_weak = is_curr_weak_;
-        bool is_weak = false;
-        if(_task_profile.transfer_profile.connect_profile.ip_index > 0 && _task_profile.err_type != kEctOK && _task_profile.err_type != kEctEnDecode) {
-            is_weak = true;
-            if(!is_curr_weak_)   __ReportWeakLogic(kSceneTask, 1, false);
-        }
-        else if(_task_profile.err_type == kEctOK && (_task_profile.end_task_time - _task_profile.start_task_time) >= WEAK_TASK_SPAN) {
-            is_weak = true;
-            if(!is_curr_weak_)  __ReportWeakLogic(kSceneTaskBad, 1, false);
-        }
-        if(is_weak) {
-            if(!is_curr_weak_) {
-                first_mark_tick_.gettickcount();
-                __ReportWeakLogic(kEnterWeak, 1, false);
-                is_curr_weak_ = true;
-                connect_after_weak_ = 0;
-                last_mark_tick_.gettickcount();
-                xinfo2(TSF"weak network errtype:%_", _task_profile.err_type);
-            }
-            last_mark_tick_.gettickcount();
+
+    if (mIsCurrWeak || old_weak) {
+        __ReportWeakLogic(kCGICount, 1, false);
+        if (taskProfile.errType == kEctOK) {
+            __ReportWeakLogic(kCGISucc, 1, false);
+            __ReportWeakLogic(kCGICost, (int) (taskProfile.endTaskTime - taskProfile.startTaskTime), false);
         } else {
-            if(_task_profile.err_type == kEctOK && (_task_profile.end_task_time - _task_profile.start_task_time) < GOOD_TASK_SPAN) {
-                if(is_curr_weak_) {
-                    is_curr_weak_ = false;
-                    __ReportWeakLogic(kExitWeak, 1, false);
-                    __ReportWeakLogic(kExitSceneTask, 1, false);
-                    __ReportWeakLogic(kWeakTime, (int)first_mark_tick_.gettickspan(), false);
-                    xinfo2(TSF"weak network end");
-                }
-            }
-        }
-        
-        if(is_curr_weak_ || old_weak) {
-            __ReportWeakLogic(kCGICount, 1, false);
-            if(_task_profile.err_type == kEctOK) {
-                __ReportWeakLogic(kCGISucc, 1, false);
-                __ReportWeakLogic(kCGICost, (int)(_task_profile.end_task_time - _task_profile.start_task_time), false);
-            } else {
-                __ReportWeakLogic(kFailStepDns + _task_profile.GetFailStep() - 1, 1, false);
-            }
+            __ReportWeakLogic(kFailStepDns + taskProfile.GetFailStep() - 1, 1, false);
         }
     }
-    
+}
+
 }
 }

@@ -85,7 +85,7 @@ class ConnectCheckFSM : public TcpClientFSM {
         ECheckFail,
     };
 
-    ConnectCheckFSM(const socket_address& _addr, unsigned int _connect_timeout, unsigned int _index, MComplexConnect* _observer)
+    ConnectCheckFSM(const socket_address& _addr, unsigned int _connect_timeout, unsigned int _index, IComplexConnect* _observer)
         : TcpClientFSM(_addr.address()), connect_timeout_(_connect_timeout), index_(_index), observer_(_observer), checkfintime_(0) {
         check_status_ = (_observer && _observer->OnShouldVerify(_index, addr_)) ? ECheckInit : ECheckOK;
     }
@@ -145,7 +145,7 @@ class ConnectCheckFSM : public TcpClientFSM {
   protected:
     const unsigned int connect_timeout_;
     const unsigned int index_;
-    MComplexConnect* observer_;
+    IComplexConnect* observer_;
     TCheckStatus check_status_;
     uint64_t checkfintime_;
 };
@@ -154,7 +154,7 @@ class ConnectCheckFSM : public TcpClientFSM {
 class ConnectHttpTunelCheckFSM : public ConnectCheckFSM {
 public:
     ConnectHttpTunelCheckFSM(const socket_address& _destaddr, const socket_address& _proxy_addr, const std::string& _proxy_username,
-                             const std::string& _proxy_pwd, unsigned int _connect_timeout, unsigned int _index, MComplexConnect* _observer)
+                             const std::string& _proxy_pwd, unsigned int _connect_timeout, unsigned int _index, IComplexConnect* _observer)
     : ConnectCheckFSM(_proxy_addr, _connect_timeout,_index,_observer), destaddr_(_destaddr), username_(_proxy_username), password_(_proxy_pwd){
         check_status_ = ECheckInit;
         xinfo2(TSF"http tunel proxy info:%_:%_ username:%_", _proxy_addr.ip(), _proxy_addr.port(), username_);
@@ -261,7 +261,7 @@ class ConnectSocks5CheckFSM : public ConnectCheckFSM {
 public:
     
     ConnectSocks5CheckFSM(const socket_address& _destaddr, const socket_address& _proxy_addr, const std::string& _proxy_username,
-                          const std::string& _proxy_pwd, unsigned int _connect_timeout, unsigned int _index, MComplexConnect* _observer)
+                          const std::string& _proxy_pwd, unsigned int _connect_timeout, unsigned int _index, IComplexConnect* _observer)
     : ConnectCheckFSM(_proxy_addr, _connect_timeout,_index,_observer), destaddr_(_destaddr), username_(_proxy_username), password_(_proxy_pwd){
         check_status_ = ECheckInit;
         xinfo2(TSF"socks5 proxy info:%_:%_ username:%_", _proxy_addr.ip(), _proxy_addr.port(), username_);
@@ -437,7 +437,7 @@ private:
 static bool __isconnecting(const ConnectCheckFSM* _ref) { return NULL != _ref && INVALID_SOCKET != _ref->Socket(); }
 }
 
-SOCKET ComplexConnect::ConnectImpatient(const std::vector<socket_address>& _vecaddr, SocketBreaker& _breaker, MComplexConnect* _observer,
+SOCKET ComplexConnect::ConnectImpatient(const std::vector<socket_address>& _vecaddr, SocketBreaker& _breaker, IComplexConnect* _observer,
                                             mars::comm::ProxyType _proxy_type, const socket_address* _proxy_addr,
                                             const std::string& _proxy_username, const std::string& _proxy_pwd) {
     trycount_ = 0;
