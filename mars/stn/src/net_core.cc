@@ -282,6 +282,18 @@ void NetCore::StartTask(const Task& _task) {
         OnTaskEnd(task.taskid, task.user_context, kEctLocal, kEctLocalNoNet);
         return;
     }
+    
+#ifdef ANDROID
+    if (kNoNet == ::getNetInfo() && !ActiveLogic::Singleton::Instance()->IsActive()
+#ifdef USE_LONG_LINK
+    && LongLink::kConnected != longlink_task_manager_->LongLinkChannel().ConnectStatus()
+#endif
+    ){
+        xerror2(TSF" error no net (%_, %_) return when no active", kEctLocal, kEctLocalNoNet) >> group;
+        OnTaskEnd(task.taskid, task.user_context, kEctLocal, kEctLocalNoNet);
+        return;
+    }
+#endif
 
     bool start_ok = false;
 
@@ -491,7 +503,7 @@ void NetCore::RedoTasks() {
 }
 
 void NetCore::RetryTasks(ErrCmdType _err_type, int _err_code, int _fail_handle, uint32_t _src_taskid) {
-
+    xinfo2(TSF"shortlink_task_manager retry task id %_ ", _src_taskid);
 	shortlink_task_manager_->RetryTasks(_err_type, _err_code, _fail_handle, _src_taskid);
 #ifdef USE_LONG_LINK
 	longlink_task_manager_->RetryTasks(_err_type, _err_code, _fail_handle, _src_taskid);

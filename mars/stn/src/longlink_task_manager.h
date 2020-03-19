@@ -27,7 +27,6 @@
 #include "boost/function.hpp"
 
 #include "mars/comm/messagequeue/message_queue.h"
-#include "mars/comm/alarm.h"
 #include "mars/stn/stn.h"
 
 #include "longlink.h"
@@ -59,6 +58,7 @@ class LongLinkTaskManager {
     
     boost::function<void (uint64_t _channel_id, uint32_t _cmdid, uint32_t _taskid, const AutoBuffer& _body, const AutoBuffer& _extend)> fun_on_push_;
     
+    static boost::function<void (std::vector<std::string>& _host_list)> get_real_host_;
 
   public:
     LongLinkTaskManager(mars::stn::NetSource& _netsource, ActiveLogic& _activelogic, DynamicTimeout& _dynamictimeout, MessageQueue::MessageQueue_t  _messagequeueid);

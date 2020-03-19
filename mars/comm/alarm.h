@@ -84,7 +84,11 @@ class Alarm {
 #endif
     }
 
-    bool Start(int _after);  // ms
+#ifdef ANDROID
+    static void onAlarmImpl(int64_t _id);
+#endif
+
+    bool Start(int _after, bool _needWake=true);  // ms
     bool Cancel();
 
     bool IsWaiting() const;

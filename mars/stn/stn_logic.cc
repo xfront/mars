@@ -34,6 +34,7 @@
 #include "mars/comm/singleton.h"
 #include "mars/comm/bootrun.h"
 #include "mars/comm/platform_comm.h"
+#include "mars/comm/alarm.h"
 #include "mars/boost/signals2.hpp"
 #include "stn/src/net_core.h"//一定要放这里，Mac os 编译
 #include "stn/src/net_source.h"
@@ -125,6 +126,13 @@ static void OnNetworkDataChange(const char* _tag, ssize_t _send, ssize_t _recv) 
     }
 }
 
+#ifdef ANDROID
+//must dipatch by function in stn_logic.cc, to avoid static member bug
+static void onAlarm(int64_t _id) {
+    Alarm::onAlarmImpl(_id);
+}
+#endif
+
 static void __initbind_baseprjevent() {
 
 #ifdef WIN32
@@ -133,6 +141,7 @@ static void __initbind_baseprjevent() {
 
 #ifdef ANDROID
 	mars::baseevent::addLoadModule(kLibName);
+    GetSignalOnAlarm().connect(&onAlarm);
 #endif
     GetSignalOnCreate().connect(&onCreate);
     GetSignalOnDestroy().connect(&onDestroy);   //low priority signal func
@@ -270,10 +279,10 @@ void network_export_symbols_0(){}
 
 #ifndef ANDROID
 	//callback functions
-bool (*MakesureAuthed)()
-= []() {
+bool (*MakesureAuthed)(const std::string& _host)
+= [](const std::string& _host) {
 	xassert2(sg_callback != NULL);
-	return sg_callback->MakesureAuthed();
+	return sg_callback->MakesureAuthed(_host);
 };
 
 // 流量统计 
@@ -297,10 +306,10 @@ void (*OnPush)(uint64_t _channel_id, uint32_t _cmdid, uint32_t _taskid, const Au
 	sg_callback->OnPush(_channel_id, _cmdid, _taskid, _body, _extend);
 };
 //底层获取task要发送的数据 
-bool (*Req2Buf)(uint32_t taskid,  void* const user_context, AutoBuffer& outbuffer, AutoBuffer& extend, int& error_code, const int channel_select)
-= [](uint32_t taskid,  void* const user_context, AutoBuffer& outbuffer, AutoBuffer& extend, int& error_code, const int channel_select) {
+bool (*Req2Buf)(uint32_t taskid,  void* const user_context, AutoBuffer& outbuffer, AutoBuffer& extend, int& error_code, const int channel_select, const std::string& host)
+= [](uint32_t taskid,  void* const user_context, AutoBuffer& outbuffer, AutoBuffer& extend, int& error_code, const int channel_select, const std::string& host) {
 	xassert2(sg_callback != NULL);
-	return sg_callback->Req2Buf(taskid, user_context, outbuffer, extend, error_code, channel_select);
+	return sg_callback->Req2Buf(taskid, user_context, outbuffer, extend, error_code, channel_select, host);
 };
 //底层回包返回给上层解析 
 int (*Buf2Resp)(uint32_t taskid, void* const user_context, const AutoBuffer& inbuffer, const AutoBuffer& extend, int& error_code, const int channel_select)

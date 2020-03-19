@@ -96,13 +96,13 @@ void TcpClientFSM::Close(bool _notify) {
     if (INVALID_SOCKET == sock_) return;
 
     if (remote_close_ || 0 != error_) {
+        xinfo2(TSF"sock:%_, (%_:%_), close local socket close, notify:%_", sock_, addr_.ip(), addr_.port(), _notify);
         socket_close(sock_);
         sock_ = INVALID_SOCKET;
         return;
     }
 
     xinfo2(TSF"sock:%_, (%_:%_), close local socket close, notify:%_", sock_, addr_.ip(), addr_.port(), _notify);
-
     socket_close(sock_);
     sock_ = INVALID_SOCKET;
 
@@ -188,7 +188,7 @@ void TcpClientFSM::PreConnectSelect(SocketSelect& _sel, XLogger& _log) {
         error_ = socket_errno;
         xerror2(TSF"close socket_set_nobio:(%_, %_)", error_, socket_strerror(error_)) >> _log;
     } else {
-        xinfo2(TSF"socket:%_, ", sock_) >> _log;
+        xinfo2(TSF"sock:%_, ", sock_) >> _log;
     }
 
     if (0 != error_) {
